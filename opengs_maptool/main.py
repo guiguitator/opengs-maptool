@@ -5,6 +5,7 @@ from opengs_maptool.ui.main_window import MainWindow
 
 def main() -> int:
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
     window = MainWindow()
     window.show()
     return app.exec()
