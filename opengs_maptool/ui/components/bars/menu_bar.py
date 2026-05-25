@@ -7,6 +7,7 @@ class MenuBar:
         self._create_actions()
         self._create_menu_bar()
 
+
     def _create_actions(self):
         self.action_new = QAction("New", self._main_window)
         self.action_new.setShortcut(QKeySequence.StandardKey.New)
@@ -44,6 +45,10 @@ class MenuBar:
         self.action_fullscreen = QAction("Fullscreen", self._main_window)
         self.action_fullscreen.setShortcut(QKeySequence.StandardKey.FullScreen)
 
+        self.action_open_github = QAction("GitHub", self._main_window)
+        self.action_open_discord = QAction("Discord", self._main_window)
+        
+
     def _create_menu_bar(self):
         menu_bar: QMenuBar = self._main_window.menuBar()
 
@@ -68,3 +73,7 @@ class MenuBar:
         menu_view.addAction(self.action_zoom_reset)
         menu_view.addSeparator()
         menu_view.addAction(self.action_fullscreen)
+
+        menu_help = menu_bar.addMenu("Help")
+        menu_help.addAction(self.action_open_github)
+        menu_help.addAction(self.action_open_discord)

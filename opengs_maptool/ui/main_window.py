@@ -19,7 +19,6 @@ from opengs_maptool.ui.components.tabs.land_tab import LandTab
 
 from PyQt6.QtCore import Qt
 
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -41,14 +40,30 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Left panel
-        left_panel = LeftPanel()
-        splitter.addWidget(left_panel)
+        self._left_panel = LeftPanel()
+        splitter.addWidget(self._left_panel)
 
         # Central panel
         tabs = QTabWidget()
+        tabs.currentChanged.connect(self._update_left_panel)
 
         self._land_tab = LandTab()
         tabs.addTab(self._land_tab, "Land")
+
+        self._boundary_tab = LandTab() # FIXME: use BoundaryTab()
+        tabs.addTab(self._boundary_tab, "Boundary")
+
+        self._density_tab = LandTab() # FIXME: use DensityTab()
+        tabs.addTab(self._density_tab, "Density")
+
+        self._terrain_tab = LandTab() # FIXME: use TerrainTab()
+        tabs.addTab(self._terrain_tab, "Terrain")
+
+        self._territory_tab = LandTab() # FIXME: use TerritoryTab()
+        tabs.addTab(self._territory_tab, "Territory")
+
+        self._province_tab = LandTab() # FIXME: use ProvinceTab()
+        tabs.addTab(self._province_tab, "Province")
 
         splitter.addWidget(tabs)
 
@@ -60,3 +75,7 @@ class MainWindow(QMainWindow):
         splitter.setChildrenCollapsible(False)
 
         main_layout.addWidget(splitter)
+
+    def _update_left_panel(self, index):
+        tab_names = ['land', 'boundary', 'density', 'terrain', 'territory', 'province']
+        self._left_panel.display_content(tab_names[index])
