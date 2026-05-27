@@ -15,7 +15,7 @@ from opengs_maptool.ui.components.bars.status_bar import StatusBar
 from opengs_maptool.ui.components.bars.tool_bar import ToolBar
 from opengs_maptool.ui.components.panels.left_panel import LeftPanel
 from opengs_maptool.ui.components.panels.right_panel import RightPanel
-from opengs_maptool.ui.components.tabs.land_tab import LandTab
+from opengs_maptool.ui.components.tab import Tab
 
 from PyQt6.QtCore import Qt
 
@@ -40,32 +40,21 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Left panel
-        self._left_panel = LeftPanel()
+        self._left_panel = LeftPanel(self)
         splitter.addWidget(self._left_panel)
 
         # Central panel
-        tabs = QTabWidget()
-        tabs.currentChanged.connect(self._update_left_panel)
+        self._tabs = QTabWidget()
+        self._tabs.currentChanged.connect(self._update_left_panel)
 
-        self._land_tab = LandTab()
-        tabs.addTab(self._land_tab, "Land")
+        # Create all tabs
+        self._tabs_names = ['land', 'boundary', 'density', 'terrain', 'territory', 'province']
 
-        self._boundary_tab = LandTab() # FIXME: use BoundaryTab()
-        tabs.addTab(self._boundary_tab, "Boundary")
+        for tab_name in self._tabs_names:
+            tab = Tab(tab_name)
+            self._tabs.addTab(tab, tab_name.capitalize())
 
-        self._density_tab = LandTab() # FIXME: use DensityTab()
-        tabs.addTab(self._density_tab, "Density")
-
-        self._terrain_tab = LandTab() # FIXME: use TerrainTab()
-        tabs.addTab(self._terrain_tab, "Terrain")
-
-        self._territory_tab = LandTab() # FIXME: use TerritoryTab()
-        tabs.addTab(self._territory_tab, "Territory")
-
-        self._province_tab = LandTab() # FIXME: use ProvinceTab()
-        tabs.addTab(self._province_tab, "Province")
-
-        splitter.addWidget(tabs)
+        splitter.addWidget(self._tabs)
 
         # Right panel
         right_panel = RightPanel()
@@ -76,6 +65,17 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(splitter)
 
+
     def _update_left_panel(self, index):
-        tab_names = ['land', 'boundary', 'density', 'terrain', 'territory', 'province']
-        self._left_panel.display_content(tab_names[index])
+        self._left_panel.display_content(self._tabs_names[index])
+
+
+    def get_image_display(self, tab_name):
+        for tab in self._tabs:
+            if (tab_name == tab.get_tab_name()):
+                return tab.get_image_display()
+        return None
+
+    def get_current_image_display(self):
+        current_tab = self._tabs.currentWidget()
+        return current_tab.get_image_display()
