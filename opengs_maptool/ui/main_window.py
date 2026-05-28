@@ -2,7 +2,6 @@ import opengs_maptool.config as config
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QProgressBar, QTabWidget, QLabel, QSplitter
 from opengs_maptool.logic.province_generator import generate_province_map
 from opengs_maptool.logic.territory_generator import generate_territory_map
-from opengs_maptool.logic.import_module import import_image, import_density_image, import_terrain_image
 from opengs_maptool.logic.density_generator import normalize_density, equator_density
 from opengs_maptool.logic.export_module import (export_image, export_territory_definitions,
                                  export_territory_history,
@@ -20,15 +19,16 @@ from opengs_maptool.ui.components.tab import Tab
 from PyQt6.QtCore import Qt
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, app):
         super().__init__()
+        self._app = app
 
         self.setWindowTitle(config.TITLE)
         self.setMinimumSize(800, 600)
         self.resize(config.WINDOW_SIZE_WIDTH, config.WINDOW_SIZE_HEIGHT)
 
         self._menu_bar = MenuBar(self)
-        self._tool_bar = ToolBar(self)        
+        self._tool_bar = ToolBar(self)
         self._status_bar = StatusBar(self)
 
         central_widget = QWidget()
@@ -40,7 +40,7 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Left panel
-        self._left_panel = LeftPanel(self)
+        self._left_panel = LeftPanel(self._app, self)
         splitter.addWidget(self._left_panel)
 
         # Central panel
@@ -56,7 +56,7 @@ class MainWindow(QMainWindow):
 
         splitter.addWidget(self._tabs)
 
-        # Right panel
+        # TODO: Right panel
         right_panel = RightPanel()
         splitter.addWidget(right_panel)
 
@@ -70,11 +70,25 @@ class MainWindow(QMainWindow):
         self._left_panel.display_content(self._tabs_names[index])
 
 
-    def get_image_display(self, tab_name):
-        for tab in self._tabs:
-            if (tab_name == tab.get_tab_name()):
-                return tab.get_image_display()
-        return None
+    def update_all_image_displays(self):
+        for i in range(self._tabs.count()):
+            tab = self._tabs.widget(i)
+            tab_name = tab.get_tab_name()
+            
+            match tab_name:
+                case "land":
+                    tab.get_image_display().set_image(self._app.project.land_image)
+                case "boundary":
+                    tab.get_image_display().set_image(self._app.project.boundary_image)
+                case "density":
+                    tab.get_image_display().set_image(self._app.project.density_image)
+                case "terrain":
+                    tab.get_image_display().set_image(self._app.project.terrain_image)
+                case "territory":
+                    tab.get_image_display().set_image(self._app.project.territory_image)
+                case "province":
+                    tab.get_image_display().set_image(self._app.project.province_image)
+
 
     def get_current_image_display(self):
         current_tab = self._tabs.currentWidget()

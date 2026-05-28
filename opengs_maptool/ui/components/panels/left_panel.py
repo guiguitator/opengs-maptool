@@ -10,15 +10,17 @@ from opengs_maptool.logic.export_module import (
     export_province_definitions
 )
 from opengs_maptool.logic.import_module import (
-    import_density_image, import_image, import_terrain_image
+    import_land_image, import_boundary_image,
+    import_density_image, import_terrain_image
 )
 from opengs_maptool.logic.territory_generator import generate_territory_map
 
 from opengs_maptool.ui.buttons import create_button, create_checkbox, create_slider
 
 class LeftPanel(QWidget):
-    def __init__(self, main_window):
+    def __init__(self, app, main_window):
         super().__init__()
+        self._app = app
         self._main_window = main_window
 
         self.setMinimumWidth(280)
@@ -35,6 +37,7 @@ class LeftPanel(QWidget):
 
 
     def display_content(self, tab_name: str):
+        self._current_tab_name = tab_name
         self._clear_content()
 
         match tab_name:
@@ -70,9 +73,7 @@ class LeftPanel(QWidget):
         create_button(
             actions_layout,
             "Import Land Image",
-            lambda: import_image(
-                self, "Import Land Image", self._main_window.get_current_image_display()
-            )
+            lambda: self._import_image(import_land_image)
         )
 
         actions_group.setLayout(actions_layout)
@@ -113,9 +114,7 @@ class LeftPanel(QWidget):
         create_button(
             actions_layout,
             "Import Boundary Image",
-            lambda: import_image(
-                self, "Import Boundary Image", self._main_window.get_current_image_display()
-            )
+            lambda: self._import_image(import_boundary_image)
         )
 
         actions_group.setLayout(actions_layout)
@@ -130,9 +129,7 @@ class LeftPanel(QWidget):
         create_button(
             actions_layout,
             "Import Density Image",
-            lambda: import_density_image(
-                self, self._main_window.get_current_image_display()
-            )
+            lambda: self._import_image(import_density_image)
         )
 
         # Normalize density button
@@ -141,8 +138,7 @@ class LeftPanel(QWidget):
             "Normalize Density",
             lambda: normalize_density(self)
         )
-        button_normalize_density.setEnabled(False)
-        button_normalize_density.setToolTip("You must load a density image first")
+        button_normalize_density.setEnabled(self._app.project.density_image == None)
 
         # Equator distribution button
         btn_equator_distribution = create_button(
@@ -150,8 +146,7 @@ class LeftPanel(QWidget):
             "Equator Distribution",
             lambda: equator_density(self)
         )
-        btn_equator_distribution.setEnabled(False)
-        btn_equator_distribution.setToolTip("You must load a density image first")
+        btn_equator_distribution.setEnabled(self._app.project.density_image == None)
 
         # Territory exclude ocean checkbox
         checkbox_territory_exclude_ocean = create_checkbox(
@@ -175,9 +170,7 @@ class LeftPanel(QWidget):
         create_button(
             actions_layout,
             "Import Terrain Image",
-            lambda: import_terrain_image(
-                self, self._main_window.get_current_image_display()
-            )
+            lambda: self._import_image(import_terrain_image)
         )
 
         actions_group.setLayout(actions_layout)
@@ -271,3 +264,9 @@ class LeftPanel(QWidget):
     # TODO: ...
     def _display_province_content(self):
         pass
+
+
+    def _import_image(self, import_image_function):
+        import_image_function(self, self._app.project)
+        self._main_window.update_all_image_displays()
+        self.display_content(self._current_tab_name)
