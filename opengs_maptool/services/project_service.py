@@ -1,0 +1,87 @@
+from io import BytesIO
+import json
+from opengs_maptool.models.project import Project
+from PIL import Image
+import zipfile
+
+class ProjectService:
+
+    def create(self) -> Project:
+        project = Project()
+        return project
+
+
+    def load(self, filename: str) -> Project:
+        with zipfile.ZipFile(filename, "r") as zip:
+            details = json.loads(zip.read("project.json"))
+
+            project = Project(details['name'], details['editor_version'])
+            project.file_path = filename
+
+            project.land_image = self._load_image_from_zip(zip, "land.png")
+            project.boundary_image = self._load_image_from_zip(zip, "boundary.png")
+            project.density_image = self._load_image_from_zip(zip, "density.png")
+            project.terrain_image = self._load_image_from_zip(zip, "terrain.png")
+            project.territory_image = self._load_image_from_zip(zip, "territory.png")
+            project.province_image = self._load_image_from_zip(zip, "province.png")
+
+            return project
+
+
+    def save(self, project: Project, filename: str):
+        with zipfile.ZipFile(filename, "w", zipfile.ZIP_DEFLATED) as zip:
+            project.file_path = filename
+
+            # Save the project's main details
+            details = {
+                "name": project.name,
+                "editor_version": project.editor_version
+            }
+
+            zip.writestr("project.json", json.dumps(details, indent=4))
+
+            # Save map images
+            self._save_image_in_zip(zip, project.land_image, "land.png")
+            self._save_image_in_zip(zip, project.boundary_image, "boundary.png")
+            self._save_image_in_zip(zip, project.density_image, "density.png")
+            self._save_image_in_zip(zip, project.terrain_image, "terrain.png")
+            self._save_image_in_zip(zip, project.territory_image, "territory.png")
+            self._save_image_in_zip(zip, project.province_image, "province.png")
+
+            # Save map data
+            self._save_data_in_zip(zip, project.territory_data, "territory_data.json")
+            self._save_data_in_zip(zip, project.province_data, "province_data.json")
+
+            # TODO: Also save metadata such as masks or pmaps
+            
+            # Update dirty indicator
+            project.modified = False
+
+
+    def _load_image_from_zip(self, zip, filename) -> Image:
+        try:
+            image_data = zip.read("images/" + filename)
+
+        except KeyError:
+            return None
+
+        return Image.open(
+            BytesIO(image_data)
+        ).copy()
+
+
+    def _save_image_in_zip(self, zip, image, filename):
+        if image == None:
+            return
+        
+        buffer = BytesIO()
+
+        image.save(buffer, format="PNG")
+        zip.writestr("images/" + filename, buffer.getvalue())
+
+
+    def _save_data_in_zip(self, zip, data, filename):
+        if data == None:
+            return
+        
+        zip.writestr("data/" + filename, json.dumps(data, indent=4))

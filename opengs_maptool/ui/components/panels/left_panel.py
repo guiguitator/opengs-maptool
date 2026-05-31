@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
-    QCheckBox, QFormLayout, QGroupBox, QLineEdit,
-    QPushButton, QScrollArea, QVBoxLayout, QWidget
+    QFormLayout, QGroupBox, QLineEdit,
+    QScrollArea, QVBoxLayout, QWidget
 )
 
 import opengs_maptool.config as config
@@ -289,7 +289,6 @@ class LeftPanel(QWidget):
         actions_group.setLayout(actions_layout)
         self._content_layout.addWidget(actions_group)
 
-    # TODO: ...
     def _display_province_content(self):
         # Province actions group
         actions_group = QGroupBox("Actions")

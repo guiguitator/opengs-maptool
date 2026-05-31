@@ -1,10 +1,12 @@
 import opengs_maptool.config as config
-from PIL import Image
 
 class Project:
-    def __init__(self, name="Untitled Project", editor_version=config.VERSION):
-        self._name: str = name
-        self._editor_version: str = editor_version
+    def __init__(self, name: str = "Untitled Project", editor_version: str = config.VERSION):
+        self.name: str = name
+        self.editor_version: str = editor_version
+
+        self.file_path: str | None = None
+        self.modified: bool = False
 
         # Images of the maps
         self.land_image = None

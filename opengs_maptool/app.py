@@ -1,5 +1,7 @@
 import sys
+
 from opengs_maptool.models.project import Project
+
 from PyQt6.QtWidgets import QApplication
 
 class App(QApplication):

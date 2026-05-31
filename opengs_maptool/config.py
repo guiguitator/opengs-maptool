@@ -91,3 +91,7 @@ TERRAIN_TYPES = {**LAND_TERRAIN_TYPES, **NAVAL_TERRAIN_TYPES, **LAKE_TERRAIN_TYP
 DEFAULT_TERRAIN_LAND = "plains"
 DEFAULT_TERRAIN_OCEAN = "deep_ocean"
 DEFAULT_TERRAIN_LAKE = "lakes"
+
+# Others
+GITHUB_URL = "https://github.com/Thomas-Holtvedt/opengs-maptool"
+DISCORD_URL = "https://discord.gg/TuXMJAdQg"
