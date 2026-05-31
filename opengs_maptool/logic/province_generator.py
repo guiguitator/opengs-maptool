@@ -8,24 +8,26 @@ from opengs_maptool.logic.utils import (
     STEPS_PER_REGION_MAP
 )
 
+from opengs_maptool.models.project import Project
 
-def generate_province_map(main_layout):
+
+def generate_province_map(project: Project):
     clear_used_colors()
-    main_layout.progress.setVisible(True)
-    main_layout.progress.setValue(0)
+    # main_layout.progress.setVisible(True)
+    # main_layout.progress.setValue(0)
 
-    territory_pmap = main_layout.territory_pmap
-    territory_data = main_layout.territory_data
-    masks = main_layout.cached_masks
-    density_arr = np.array(main_layout.density_image)
-    density_strength = main_layout.province_density_strength.value() / 10.0
-    exclude_ocean_density = main_layout.province_exclude_ocean_density.isChecked()
-    jagged_land = main_layout.province_jagged_land.isChecked()
-    jagged_ocean = main_layout.province_jagged_ocean.isChecked()
+    territory_pmap = project.territory_pmap
+    territory_data = project.territory_data
+    masks = project.cached_masks
+    density_arr = np.array(project.density_image)
+    density_strength = project.province_density_strength / 10.0
+    exclude_ocean_density = project.province_exclude_ocean
+    jagged_land = project.province_jagged_land
+    jagged_ocean = project.province_jagged_ocean
     map_h, map_w = masks["map_h"], masks["map_w"]
 
-    total_land_provs = main_layout.land_slider.value()
-    total_ocean_provs = main_layout.ocean_slider.value()
+    total_land_provs = project.land_province_density
+    total_ocean_provs = project.oceanic_province_density
     lake_mask = masks.get("lake_mask")
 
     # Reset province_ids from any previous generation
@@ -68,8 +70,8 @@ def generate_province_map(main_layout):
 
     # Progress: one step per territory + setup/finalize
     total_steps = 2 + len(all_terrs) + 2
-    step = make_progress_updater(main_layout, total_steps)
-    step(2)
+    # step = make_progress_updater(main_layout, total_steps)
+    # step(2)
 
     series = NumberSeries(
         config.PROVINCE_ID_PREFIX,
@@ -159,7 +161,7 @@ def generate_province_map(main_layout):
 
         all_metadata.extend(meta)
         start_index = next_index
-        step(1)
+        # step(1)
 
     # Build province image via color lookup
     out = np.zeros((map_h, map_w, 3), np.uint8)
@@ -171,10 +173,10 @@ def generate_province_map(main_layout):
         valid = province_pmap >= 0
         out[valid] = color_lut[province_pmap[valid]]
     province_image = Image.fromarray(out)
-    step(1)
+    # step(1)
 
     # Assign terrain from terrain image, or use defaults
-    terrain_image = getattr(main_layout, "terrain_image", None)
+    terrain_image = project.terrain_image
     if terrain_image is not None:
         terrain_arr = np.array(terrain_image)
         _assign_terrain(all_metadata, terrain_arr)
@@ -188,14 +190,11 @@ def generate_province_map(main_layout):
             else:
                 prov["province_terrain"] = config.DEFAULT_TERRAIN_LAND
 
-    main_layout.province_image_display.set_image(province_image)
-    main_layout.province_data = all_metadata
-    step(1)
+    project.province_image = province_image
+    project.province_data = all_metadata
+    # step(1)
 
-    main_layout.progress.setValue(100)
-    main_layout.button_exp_prov_img.setEnabled(True)
-    main_layout.button_exp_prov_def.setEnabled(True)
-    main_layout.button_exp_terr_hist.setEnabled(True)
+    # main_layout.progress.setValue(100)
 
     return province_image, all_metadata
 

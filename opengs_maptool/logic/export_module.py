@@ -5,12 +5,12 @@ import csv
 import yaml
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-
+from opengs_maptool.models.project import Project
 
 def export_image(parent_layout, image, text):
     if image:
         try:
-            path = _pick_file_image(parent_layout, text)
+            path = _pick_file_image(None, text)
             if not path:
                 return
             
@@ -27,13 +27,13 @@ def export_image(parent_layout, image, text):
             print(f"Error saving image: {error}")
 
 
-def export_territory_definitions(main_layout):
-    territory_data = getattr(main_layout, "territory_data", None)
+def export_territory_definitions(project: Project):
+    territory_data = project.territory_data
     if not territory_data:
         print("No territory data to export.")
         return
 
-    path, fmt = _pick_file_data(main_layout, "Export Territory Definitions")
+    path, fmt = _pick_file_data(None, "Export Territory Definitions")
     if not path:
         return
 
@@ -78,13 +78,13 @@ def export_territory_definitions(main_layout):
                             round(d["x"], 2), round(d["y"], 2)])
 
 
-def export_territory_history(main_layout):
-    territory_data = getattr(main_layout, "territory_data", None)
+def export_territory_history(project: Project):
+    territory_data = project.territory_data
     if not territory_data:
         print("No territory data to export.")
         return
 
-    path, fmt = _pick_file_data(main_layout, "Export Territory History")
+    path, fmt = _pick_file_data(None, "Export Territory History")
     if not path:
         return
 
@@ -126,13 +126,13 @@ def export_territory_history(main_layout):
                 w.writerow([d["territory_id"], provinces])
 
 
-def export_province_definitions(main_layout):
-    province_data = getattr(main_layout, "province_data", None)
+def export_province_definitions(project: Project):
+    province_data = project.province_data
     if not province_data:
         print("No province data to export.")
         return
 
-    path, fmt = _pick_file_data(main_layout, "Export Province Definitions")
+    path, fmt = _pick_file_data(None, "Export Province Definitions")
     if not path:
         return
 

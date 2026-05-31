@@ -10,6 +10,7 @@ def create_slider(
     default: int,
     tick_interval: int = 100,
     step: int = 100,
+    onchange_callback_function = None,
     display_scale: float = None
 ):
 
@@ -35,6 +36,8 @@ def create_slider(
     value_label = QLabel(format_value(default))
     row.addWidget(value_label)
     slider.valueChanged.connect(lambda v: value_label.setText(format_value(v)))
+    if onchange_callback_function:
+        slider.valueChanged.connect(onchange_callback_function)
     return slider
 
 
@@ -51,8 +54,12 @@ def create_button(
 
 def create_checkbox(
     parent_layout,
-    label_text: str
+    label_text: str,
+    callback_function = None
 ):
-    button = QCheckBox(label_text)
-    parent_layout.addWidget(button)
-    return button
+    checkbox = QCheckBox(label_text)
+    if callback_function:
+        checkbox.stateChanged.connect(callback_function)
+
+    parent_layout.addWidget(checkbox)
+    return checkbox
