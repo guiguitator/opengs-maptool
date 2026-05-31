@@ -19,7 +19,7 @@ class MainWindow(QMainWindow):
         
         self._project_controller = ProjectController(self._app, self)
 
-        self.setWindowTitle(config.TITLE)
+        self.setWindowTitle(self._app.project.name + " - " + config.TITLE)
         self.setMinimumSize(800, 600)
         self.resize(config.WINDOW_SIZE_WIDTH, config.WINDOW_SIZE_HEIGHT)
         
@@ -57,8 +57,8 @@ class MainWindow(QMainWindow):
 
         splitter.addWidget(self._tabs)
 
-        # TODO: Right panel
-        right_panel = RightPanel()
+        # Right panel
+        right_panel = RightPanel(self._app)
         splitter.addWidget(right_panel)
 
         splitter.setSizes([300, 900, 300])
@@ -72,7 +72,6 @@ class MainWindow(QMainWindow):
 
 
     def update_all_image_displays(self):
-        print(self._app.project.land_image)
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             tab_name = tab.get_tab_name()

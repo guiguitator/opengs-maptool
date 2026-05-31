@@ -5,7 +5,6 @@ from PIL import Image
 import zipfile
 
 class ProjectService:
-
     def create(self) -> Project:
         project = Project()
         return project
