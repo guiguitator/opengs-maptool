@@ -192,6 +192,7 @@ def generate_province_map(project: Project):
 
     project.province_image = province_image
     project.province_data = all_metadata
+    project.modified = True
     # step(1)
 
     # main_layout.progress.setValue(100)

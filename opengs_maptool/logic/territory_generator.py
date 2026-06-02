@@ -72,6 +72,7 @@ def generate_territory_map(project: Project):
     project.territory_data = metadata
     project.territory_pmap = combined_pmap
     project.cached_masks = masks
+    project.modified = True
     # step(1)
 
     # main_layout.progress.setValue(100)

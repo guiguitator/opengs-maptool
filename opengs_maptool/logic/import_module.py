@@ -21,6 +21,7 @@ def import_land_image(project: Project):
         return
 
     project.land_image = land_image.convert("RGBA")
+    project.modified = True
 
     # Remove the density image (because dimensions may differ)
     project.density_image = None
@@ -32,6 +33,7 @@ def import_boundary_image(project: Project):
         return
     
     project.boundary_image = boundary_image.convert("RGB")
+    project.modified = True
 
 
 def import_density_image(project: Project):
@@ -40,6 +42,7 @@ def import_density_image(project: Project):
         return
         
     project.density_image = density_image.convert("L")
+    project.modified = True
 
 
 def import_terrain_image(project: Project):
@@ -48,3 +51,4 @@ def import_terrain_image(project: Project):
         return
     
     project.terrain_image = terrain_image.convert("RGB")
+    project.modified = True

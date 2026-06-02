@@ -1,7 +1,3 @@
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QProgressBar, QTabWidget, QLabel, QSplitter
-
 import opengs_maptool.config as config
 import opengs_maptool.logic.editor_actions as editor_actions
 from opengs_maptool.controllers.project_controller import ProjectController
@@ -11,6 +7,11 @@ from opengs_maptool.ui.components.bars.tool_bar import ToolBar
 from opengs_maptool.ui.components.panels.left_panel import LeftPanel
 from opengs_maptool.ui.components.panels.right_panel import RightPanel
 from opengs_maptool.ui.components.tab import Tab
+from opengs_maptool.ui.modals.save_modal import SaveModal
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction, QKeySequence
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QProgressBar, QTabWidget, QSplitter)
+import qtawesome as qta
 
 class MainWindow(QMainWindow):
     def __init__(self, app):
@@ -58,7 +59,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self._tabs)
 
         # Right panel
-        right_panel = RightPanel(self._app)
+        right_panel = RightPanel(self._app, self)
         splitter.addWidget(right_panel)
 
         splitter.setSizes([300, 900, 300])
@@ -96,18 +97,22 @@ class MainWindow(QMainWindow):
         return current_tab.get_image_display()
 
 
+    # TODO: Perhaps create an actions file containing all the actions instead of storing them here
     def _create_actions(self):
-        self.action_new = QAction("New", self)
+        self.action_new = QAction(qta.icon('fa6s.file'), "New", self)
         self.action_new.setShortcut(QKeySequence.StandardKey.New)
         self.action_new.triggered.connect(self._project_controller.new_project)
+        self.action_new.setIconVisibleInMenu(False)
 
-        self.action_open = QAction("Open", self)
+        self.action_open = QAction(qta.icon('fa6s.folder-open'), "Open", self)
         self.action_open.setShortcut(QKeySequence.StandardKey.Open)
         self.action_open.triggered.connect(self._project_controller.open_project)
+        self.action_open.setIconVisibleInMenu(False)
 
-        self.action_save = QAction("Save", self)
+        self.action_save = QAction(qta.icon('fa6s.floppy-disk'), "Save", self)
         self.action_save.setShortcut(QKeySequence.StandardKey.Save)
         self.action_save.triggered.connect(self._project_controller.save_project)
+        self.action_save.setIconVisibleInMenu(False)
 
         self.action_save_as = QAction("Save as", self)
         self.action_save_as.setShortcut(QKeySequence.StandardKey.SaveAs)
@@ -141,3 +146,15 @@ class MainWindow(QMainWindow):
         else:
             self.showNormal()
 
+    def closeEvent(self, event):
+        if self._app.project.modified == True:
+            save_modal = SaveModal(self)
+            response = save_modal.exec()
+
+            if response == SaveModal.StandardButton.Save:
+                self._project_controller.save_project()
+                event.ignore()
+            elif response == SaveModal.StandardButton.Discard:
+                self.close()
+            else:
+                event.ignore()

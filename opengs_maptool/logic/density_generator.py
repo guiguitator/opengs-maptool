@@ -11,7 +11,9 @@ def normalize_density(project: Project):
 
     w, h = land_image.size
     density_image = Image.new("L", (w, h), config.DEFAULT_DENSITY_GREY)
+    
     project.density_image = density_image
+    project.modified = True
 
 
 def equator_density(project: Project):
@@ -29,8 +31,13 @@ def equator_density(project: Project):
 
     density_image = Image.fromarray(arr, mode="L")
     project.density_image = density_image
+    project.modified = True
 
 
 # TODO: Move this function, it doesn't belong in this file
 def remove_density_image(project: Project):
+    if not project.density_image:
+        return
+    
     project.density_image = None
+    project.modified = True

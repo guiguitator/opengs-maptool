@@ -1,12 +1,18 @@
 import opengs_maptool.config as config
 
 class Project:
-    def __init__(self, name: str = "Untitled Project", editor_version: str = config.VERSION):
+    def __init__(
+            self, 
+            name: str = "Untitled Project",
+            editor_version: str = config.VERSION,
+            description: str | None = None,
+            author: str | None = None
+        ):
+        # Project description
         self.name: str = name
         self.editor_version: str = editor_version
-
-        self.file_path: str | None = None
-        self.modified: bool = False
+        self.description: str | None = description
+        self.author: str | None = author
 
         # Images of the maps
         self.land_image = None
@@ -40,13 +46,16 @@ class Project:
         self.province_jagged_land = False
         self.province_jagged_ocean = False
 
+        # Others
+        self.file_path: str | None = None
+        self.modified: bool = False
+
 
     def can_territory_image_be_generated(self) -> bool:
         if (
             not self.land_image or
             not self.boundary_image or
-            not self.density_image or
-            not self.terrain_image
+            not self.density_image
         ):
             return False
         

@@ -1,4 +1,3 @@
-from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenuBar
 
 class MenuBar:

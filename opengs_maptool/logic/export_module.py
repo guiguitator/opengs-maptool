@@ -190,13 +190,13 @@ def export_province_definitions(project: Project):
 def _pick_file_image(parent, title):
     """Open save dialog with image format filters. Returns path (with valid file extension) or None"""
     filters = (
-        "All Files (*);;"
         "PNG Files (*.png);;"
         "JPEG Files (*.jpg *.jpeg);;"
         "BMP Files (*.bmp);;"
         "GIF Files (*.gif);;"
         "TIFF Files (*.tiff *.tif);;"
-        "WebP Files (*.webp)"
+        "WebP Files (*.webp);;"
+        "All Files (*)"
     )
     
     path, selected_filter = QFileDialog.getSaveFileName(parent, title, "", filters)
@@ -225,11 +225,11 @@ def _pick_file_image(parent, title):
 def _pick_file_data(parent, title):
     """Open save dialog with data format filters. Returns (path, format) or (None, None)."""
     filters = (
-        "All Files (*);;"
         "JSON Files (*.json);;"
         "CSV Files (*.csv);;"
         "YAML Files (*.yaml *.yml);;"
-        "XML Files (*.xml)"
+        "XML Files (*.xml);;"
+        "All Files (*)"
     )
     
     path, selected_filter = QFileDialog.getSaveFileName(parent, title, "", filters)

@@ -6,16 +6,29 @@ import zipfile
 
 class ProjectService:
     def create(self) -> Project:
-        project = Project()
+        """
+        Create a new empty project.
+        """
+        project = Project()        
         return project
 
 
-    def load(self, filename: str) -> Project:
-        with zipfile.ZipFile(filename, "r") as zip:
+    def load(self, path: str) -> Project:
+        """
+        Load a project saved to disk (GSMAP file or ZIP)
+
+        @param path: The file path
+        """
+        with zipfile.ZipFile(path, "r") as zip:
             details = json.loads(zip.read("project.json"))
 
-            project = Project(details['name'], details['editor_version'])
-            project.file_path = filename
+            project = Project(
+                name=details['name'],
+                editor_version=details['editor_version'],
+                description=details.get('description'),
+                author=details.get('author')
+            )
+            project.file_path = path
 
             project.land_image = self._load_image_from_zip(zip, "land.png")
             project.boundary_image = self._load_image_from_zip(zip, "boundary.png")
@@ -27,14 +40,21 @@ class ProjectService:
             return project
 
 
-    def save(self, project: Project, filename: str):
-        with zipfile.ZipFile(filename, "w", zipfile.ZIP_DEFLATED) as zip:
-            project.file_path = filename
+    def save(self, project: Project, path: str):
+        """
+        Save a project to disk (GSMAP file or ZIP)
+
+        @param path: The file path
+        """
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zip:
+            project.file_path = path
 
             # Save the project's main details
             details = {
                 "name": project.name,
-                "editor_version": project.editor_version
+                "editor_version": project.editor_version,
+                "description": project.description,
+                "author": project.author
             }
 
             zip.writestr("project.json", json.dumps(details, indent=4))
@@ -58,6 +78,12 @@ class ProjectService:
 
 
     def _load_image_from_zip(self, zip, filename) -> Image:
+        """
+        Private method for loading an image contained in a GSMAP or ZIP file 
+
+        @param zip: The GSMAP or ZIP file
+        @param filename: The image name (example: land.png)
+        """
         try:
             image_data = zip.read("images/" + filename)
 
@@ -70,6 +96,13 @@ class ProjectService:
 
 
     def _save_image_in_zip(self, zip, image, filename):
+        """
+        Private method for saving an image to a GSMAP or ZIP file.
+
+        @param zip: The GSMAP or ZIP file
+        @param image: The image
+        @param filename: The image name (example: density.png)
+        """
         if image == None:
             return
         
@@ -80,6 +113,13 @@ class ProjectService:
 
 
     def _save_data_in_zip(self, zip, data, filename):
+        """
+        Private method for saving data (dictionary) in JSON format to a GSMAP or ZIP file.
+
+        @param zip: The GSMAP or ZIP file
+        @param image: The data
+        @param filename: The file name (example: province_data.json)
+        """
         if data == None:
             return
         
