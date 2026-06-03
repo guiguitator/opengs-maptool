@@ -69,6 +69,7 @@ class ProjectController:
 
 
     def _update_main_window(self):
+        self._main_window.update_current_left_panel()
         self._main_window.update_all_image_displays()
         self._main_window.setWindowTitle(self._app.project.name + " - " + config.TITLE)
 

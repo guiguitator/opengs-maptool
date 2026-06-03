@@ -71,6 +71,10 @@ class MainWindow(QMainWindow):
     def _update_left_panel(self, index):
         self._left_panel.display_content(self._tabs_names[index])
 
+    
+    def update_current_left_panel(self):
+        self._update_left_panel(self._tabs.currentIndex())
+
 
     def update_all_image_displays(self):
         for i in range(self._tabs.count()):
