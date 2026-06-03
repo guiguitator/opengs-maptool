@@ -141,13 +141,13 @@ PRV000001;lake;37;131;175;1231.82;219.37;lakes
 
 ```yaml
 PRV000001:
+  province_type: lake
   R: 37
   G: 131
   B: 175
-  province_terrain: lakes
-  province_type: lake
   x: 1231.82
   y: 219.37
+  province_terrain: lakes
 ```
 
 #### XML

@@ -15,6 +15,7 @@ from opengs_maptool.logic.import_module import (
     import_land_image, import_boundary_image,
     import_density_image, import_terrain_image
 )
+from opengs_maptool.logic.land_actions import get_land_informations
 from opengs_maptool.logic.territory_generator import generate_territory_map
 from opengs_maptool.logic.province_generator import generate_province_map
 from opengs_maptool.app import App
@@ -89,19 +90,19 @@ class LeftPanel(QWidget):
         # Land density info
         land_density = QLineEdit()
         land_density.setReadOnly(True)
-        land_density.setText('0.0%')
+        land_density.setText(f"{get_land_informations(self._app.project)[0]:.2f}%")
         infos_layout.addRow("Land density:", land_density)
 
         # Ocean density info
         ocean_density = QLineEdit()
         ocean_density.setReadOnly(True)
-        ocean_density.setText('0.0%')
+        ocean_density.setText(f"{get_land_informations(self._app.project)[1]:.2f}%")
         infos_layout.addRow("Ocean density:", ocean_density)
 
         # Lake density info
         lake_density = QLineEdit()
         lake_density.setReadOnly(True)
-        lake_density.setText('0.0%')
+        lake_density.setText(f"{get_land_informations(self._app.project)[2]:.2f}%")
         infos_layout.addRow("Lake density:", lake_density)
 
         infos_group.setLayout(infos_layout)

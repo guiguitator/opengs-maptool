@@ -274,4 +274,4 @@ def _write_json(path, data):
 
 def _write_yaml(path, data):
     with open(path, "w", encoding="utf-8") as f:
-        yaml.dump(data, f)
+        yaml.dump(data, f, sort_keys=False)
