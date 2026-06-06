@@ -1,19 +1,20 @@
-from opengs_maptool.app import App
 import opengs_maptool.config as config
+from opengs_maptool.context import ApplicationContext
 from opengs_maptool.controllers.console_controller import ConsoleController
-from opengs_maptool.logic.command_processor import command_processing
+from opengs_maptool.services.command_service import process_command
 from opengs_maptool.models.message import Message, MessageAuthor, MessageType
-from PyQt6.QtWidgets import QTextEdit, QVBoxLayout, QWidget, QLineEdit, QPushButton, QHBoxLayout
+from opengs_maptool.ui.modals.error_modal import ErrorModal
+from PyQt6.QtWidgets import QFileDialog, QTextEdit, QVBoxLayout, QWidget, QLineEdit, QPushButton, QHBoxLayout
 
 class ConsoleWidget(QWidget):
-    def __init__(self, app: App, main_window):
+    def __init__(self, context: ApplicationContext, main_window):
         super().__init__()
-        self._app = app
+        self._context = context
         self._main_window = main_window
         
         layout = QVBoxLayout()
 
-        self._console_controller = ConsoleController(self._app, self._main_window)
+        self._console_controller = ConsoleController(self._context)
         
         # Output log (read-only)
         self._output = QTextEdit()
@@ -28,7 +29,7 @@ class ConsoleWidget(QWidget):
 
         # Buttons 
         self._btn_export_logs = QPushButton("Export Logs")
-        self._btn_export_logs.clicked.connect(self._console_controller.export_console)
+        self._btn_export_logs.clicked.connect(self._export_logs)
         
         self._btn_restore_logs = QPushButton("Restore Logs")
         self._btn_restore_logs.clicked.connect(self._restore_logs)
@@ -83,19 +84,45 @@ class ConsoleWidget(QWidget):
             self.print_message(user_message) # Show message in widget
 
             # Process command
-            system_response_message = command_processing(self._app, user_message)
-            if system_response_message != None:
+            system_response_message = process_command(self._context, user_message)
+            if system_response_message is not None:
+                self._console_controller.add_system_message(
+                    system_response_message.text,
+                    system_response_message.type
+                )
                 self.print_message(system_response_message)
 
         self._input.clear()
+
+    def _export_logs(self):
+        filename, _ = QFileDialog.getSaveFileName(
+            None, "Export console history", "", "CSV Files (*.csv);;All Files (*)"
+        )
+
+        if not filename:
+            return
+
+        self._console_controller.export_console(filename)
 
 
     def _restore_logs(self):
         """
         Restores a message history in the console and displays it in the widget
         """
-        self._console_controller.import_console()
-        self._output.clear()
+        filename, _ = QFileDialog.getOpenFileName(
+            None, "Import console history", "", "CSV Files (*.csv);;All Files (*)"
+        )
 
-        for message in self._app.console.messages:
-            self.print_message(message)
+        if not filename:
+            return
+
+        try:
+            self._console_controller.import_console(filename)
+            self._output.clear()
+
+            for message in self._context.console.messages:
+                self.print_message(message)
+        except Exception:
+            error_text = "Cannot open this file, incompatible format"
+            error_modal = ErrorModal(self._main_window, error_text)
+            error_modal.exec()
