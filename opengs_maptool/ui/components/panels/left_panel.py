@@ -12,14 +12,17 @@ from opengs_maptool.logic.export_module import (
     export_province_definitions
 )
 from opengs_maptool.logic.import_module import (
-    import_land_image, import_boundary_image,
-    import_density_image, import_terrain_image
+    load_land_image, load_boundary_image,
+    load_density_image, load_terrain_image
 )
 from opengs_maptool.logic.land_actions import get_land_informations
 from opengs_maptool.logic.territory_generator import generate_territory_map
 from opengs_maptool.logic.province_generator import generate_province_map
 from opengs_maptool.context import ApplicationContext
 from opengs_maptool.ui.buttons import create_button, create_checkbox, create_slider
+from opengs_maptool.ui.file_dialogs import (
+    pick_open_image, pick_save_data, pick_save_image
+)
 
 class LeftPanel(QWidget):
     def __init__(self, context: ApplicationContext, main_window):
@@ -77,7 +80,7 @@ class LeftPanel(QWidget):
         create_button(
             actions_layout,
             "Import Land Image",
-            lambda: self._execute_function_and_update(import_land_image)
+            self._import_land_image
         )
 
         actions_group.setLayout(actions_layout)
@@ -118,7 +121,7 @@ class LeftPanel(QWidget):
         create_button(
             actions_layout,
             "Import Boundary Image",
-            lambda: self._execute_function_and_update(import_boundary_image)
+            self._import_boundary_image
         )
 
         actions_group.setLayout(actions_layout)
@@ -133,7 +136,7 @@ class LeftPanel(QWidget):
         create_button(
             actions_layout,
             "Import Density Image",
-            lambda: self._execute_function_and_update(import_density_image)
+            self._import_density_image
         )
 
         # Remove density image button
@@ -190,7 +193,7 @@ class LeftPanel(QWidget):
         create_button(
             actions_layout,
             "Import Terrain Image",
-            lambda: self._execute_function_and_update(import_terrain_image)
+            self._import_terrain_image
         )
 
         actions_group.setLayout(actions_layout)
@@ -265,9 +268,7 @@ class LeftPanel(QWidget):
         btn_export_territory_image = create_button(
             actions_layout,
             "Export Territory Image",
-            lambda: export_image(
-                self, self._context.project.territory_image, "Export Territory Image"
-            )
+            lambda: self._export_image(self._context.project.territory_image, "Export Territory Image")
         )
         btn_export_territory_image.setEnabled(self._context.project.territory_image != None)
 
@@ -275,7 +276,11 @@ class LeftPanel(QWidget):
         btn_export_territory_definitions = create_button(
             actions_layout,
             "Export Territory Definitions",
-            lambda: export_territory_definitions(self._context.project)
+            lambda: self._export_project_data(
+                self._context.project,
+                export_territory_definitions,
+                "Export Territory Definitions"
+            )
         )
         btn_export_territory_definitions.setEnabled(self._context.project.territory_data != None)
 
@@ -283,7 +288,11 @@ class LeftPanel(QWidget):
         btn_export_territory_history = create_button(
             actions_layout,
             "Export Territory History",
-            lambda: export_territory_history(self._context.project)
+            lambda: self._export_project_data(
+                self._context.project,
+                export_territory_history,
+                "Export Territory History"
+            )
         )
         btn_export_territory_history.setEnabled(self._context.project.territory_data != None)
 
@@ -360,9 +369,7 @@ class LeftPanel(QWidget):
         btn_export_province_image = create_button(
             actions_layout,
             "Export Province Image",
-            lambda: export_image(
-                self, self._context.project.province_image, "Export Province Image"
-            )
+            lambda: self._export_image(self._context.project.province_image, "Export Province Image")
         )
         btn_export_province_image.setEnabled(self._context.project.province_image != None)
 
@@ -370,12 +377,78 @@ class LeftPanel(QWidget):
         btn_export_province_definitions = create_button(
             actions_layout,
             "Export Province Definitions",
-            lambda: export_province_definitions(self._context.project)
+            lambda: self._export_project_data(
+                self._context.project,
+                export_province_definitions,
+                "Export Province Definitions"
+            )
         )
         btn_export_province_definitions.setEnabled(self._context.project.province_data != None)
 
         actions_group.setLayout(actions_layout)
         self._content_layout.addWidget(actions_group)
+
+
+    def _import_land_image(self):
+        path = pick_open_image(self, "Import Land Image")
+        if not path:
+            return
+
+        # TODO: Use a service for this and handle errors
+        self._context.project.land_image = load_land_image(path)
+        self._context.project.modified = True
+        self._context.project.density_image = None
+        self._main_window.update_all_image_displays()
+        self.display_content(self._current_tab_name)
+
+
+    def _import_boundary_image(self):
+        path = pick_open_image(self, "Import Boundary Image")
+        if not path:
+            return
+
+        self._context.project.boundary_image = load_boundary_image(path)
+        self._context.project.modified = True
+        self._main_window.update_all_image_displays()
+        self.display_content(self._current_tab_name)
+
+
+    def _import_density_image(self):
+        path = pick_open_image(self, "Import Density Image")
+        if not path:
+            return
+
+        self._context.project.density_image = load_density_image(path)
+        self._context.project.modified = True
+        self._main_window.update_all_image_displays()
+        self.display_content(self._current_tab_name)
+
+
+    def _import_terrain_image(self):
+        path = pick_open_image(self, "Import Terrain Image")
+        if not path:
+            return
+
+        self._context.project.terrain_image = load_terrain_image(path)
+        self._context.project.modified = True
+        self._main_window.update_all_image_displays()
+        self.display_content(self._current_tab_name)
+
+
+    def _export_image(self, image, title):
+        path = pick_save_image(self, title)
+        if not path:
+            return
+
+        export_image(path, image)
+
+
+    def _export_project_data(self, project, exporter_function, title):
+        path, fmt = pick_save_data(self, title)
+        if not path:
+            return
+
+        exporter_function(project, path, fmt)
 
 
     def _execute_function_and_update(self, function):

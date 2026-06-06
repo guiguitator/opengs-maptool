@@ -1,7 +1,7 @@
 import opengs_maptool.config as config
 from opengs_maptool.context import ApplicationContext
 from opengs_maptool.controllers.console_controller import ConsoleController
-from opengs_maptool.logic.command_processor import command_processing
+from opengs_maptool.services.command_service import process_command
 from opengs_maptool.models.message import Message, MessageAuthor, MessageType
 from opengs_maptool.ui.modals.error_modal import ErrorModal
 from PyQt6.QtWidgets import QFileDialog, QTextEdit, QVBoxLayout, QWidget, QLineEdit, QPushButton, QHBoxLayout
@@ -84,8 +84,12 @@ class ConsoleWidget(QWidget):
             self.print_message(user_message) # Show message in widget
 
             # Process command
-            system_response_message = command_processing(self._context, user_message)
-            if system_response_message != None:
+            system_response_message = process_command(self._context, user_message)
+            if system_response_message is not None:
+                self._console_controller.add_system_message(
+                    system_response_message.text,
+                    system_response_message.type
+                )
                 self.print_message(system_response_message)
 
         self._input.clear()
