@@ -1,61 +1,54 @@
 import opengs_maptool.config as config
+from opengs_maptool.models.project import Project
 from PIL import Image
 from PyQt6.QtWidgets import QFileDialog
 
 
-def import_image(layout, text, image_display):
+def _import_image(project: Project, text: str):
     Image.MAX_IMAGE_PIXELS = config.MAX_IMAGE_PIXELS
     path, _ = QFileDialog.getOpenFileName(
-        layout,
-        text,
-        "",
-        "Images (*.png *.jpg *.jpeg *.bmp *.gif)"
+        None, text, "", "Images (*.png *.jpg *.jpeg *.bmp *.gif)"
     )
     if not path:
         return
-
-    imported_image = Image.open(path).convert("RGBA")
-    image_display.set_image(imported_image)
-
-    # When importing a new land image, reset density (dimensions may differ)
-    if image_display is layout.land_image_display:
-        layout.density_image = None
-        layout.density_image_display.set_image(None)
-        layout.button_normalize_density.setEnabled(True)
-        layout.button_equator_density.setEnabled(True)
-
-    layout.check_territory_ready()
+    
+    return Image.open(path)
 
 
-def import_terrain_image(layout):
-    Image.MAX_IMAGE_PIXELS = config.MAX_IMAGE_PIXELS
-    path, _ = QFileDialog.getOpenFileName(
-        layout,
-        "Import Terrain Image",
-        "",
-        "Images (*.png *.jpg *.jpeg *.bmp *.gif)"
-    )
-    if not path:
+def import_land_image(project: Project):
+    land_image = _import_image(project, "Import Land Image")
+    if not land_image:
         return
 
-    terrain = Image.open(path).convert("RGB")
-    layout.terrain_image = terrain
-    layout.terrain_image_display.set_image(terrain.convert("RGBA"))
+    project.land_image = land_image.convert("RGBA")
+    project.modified = True
+
+    # Remove the density image (because dimensions may differ)
+    project.density_image = None
 
 
-def import_density_image(layout):
-    Image.MAX_IMAGE_PIXELS = config.MAX_IMAGE_PIXELS
-    path, _ = QFileDialog.getOpenFileName(
-        layout,
-        "Import Density Image",
-        "",
-        "Images (*.png *.jpg *.jpeg *.bmp *.gif)"
-    )
-    if not path:
+def import_boundary_image(project: Project):
+    boundary_image = _import_image(project, "Import Boundary Image")
+    if not boundary_image:
         return
+    
+    project.boundary_image = boundary_image.convert("RGB")
+    project.modified = True
 
-    density = Image.open(path).convert("L")
-    layout.density_image = density
 
-    layout.density_image_display.set_image(density.convert("RGBA"))
-    layout.check_territory_ready()
+def import_density_image(project: Project):
+    density_image = _import_image(project, "Import Density Image")
+    if not density_image:
+        return
+        
+    project.density_image = density_image.convert("L")
+    project.modified = True
+
+
+def import_terrain_image(project: Project):
+    terrain_image = _import_image(project, "Import Terrain Image")
+    if not terrain_image:
+        return
+    
+    project.terrain_image = terrain_image.convert("RGB")
+    project.modified = True

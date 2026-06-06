@@ -1,261 +1,164 @@
 import opengs_maptool.config as config
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QProgressBar, QTabWidget, QLabel
-from opengs_maptool.logic.province_generator import generate_province_map
-from opengs_maptool.logic.territory_generator import generate_territory_map
-from opengs_maptool.logic.import_module import import_image, import_density_image, import_terrain_image
-from opengs_maptool.logic.density_generator import normalize_density, equator_density
-from opengs_maptool.logic.export_module import (export_image, export_territory_definitions,
-                                 export_territory_history,
-                                 export_province_definitions)
-from opengs_maptool.ui.buttons import create_slider, create_button, create_checkbox
-from opengs_maptool.ui.image_display import ImageDisplay
+import opengs_maptool.logic.editor_actions as editor_actions
+from opengs_maptool.controllers.project_controller import ProjectController
+from opengs_maptool.ui.components.bars.menu_bar import MenuBar
+from opengs_maptool.ui.components.bars.status_bar import StatusBar
+from opengs_maptool.ui.components.bars.tool_bar import ToolBar
+from opengs_maptool.ui.components.panels.left_panel import LeftPanel
+from opengs_maptool.ui.components.panels.right_panel import RightPanel
+from opengs_maptool.ui.components.tab import Tab
+from opengs_maptool.ui.modals.save_modal import SaveModal
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction, QKeySequence
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QProgressBar, QTabWidget, QSplitter)
+import qtawesome as qta
 
-
-class MainWindow(QWidget):
-    def __init__(self):
+class MainWindow(QMainWindow):
+    def __init__(self, app):
         super().__init__()
+        self._app = app
+        
+        self._project_controller = ProjectController(self._app, self)
 
-        # MAIN LAYOUT
-        self.setWindowTitle(config.TITLE)
+        self.setWindowTitle(self._app.project.name + " - " + config.TITLE)
         self.setMinimumSize(800, 600)
-        self.resize(config.WINDOW_SIZE_WIDTH,
-                    config.WINDOW_SIZE_HEIGHT)
-        main_layout = QVBoxLayout(self)
-        self.setLayout(main_layout)
+        self.resize(config.WINDOW_SIZE_WIDTH, config.WINDOW_SIZE_HEIGHT)
+        
+        self._create_actions()
+        self._init_layout()
 
-        self.tabs = QTabWidget()
-        main_layout.addWidget(self.tabs, stretch=1)
 
-        self.progress = QProgressBar()
-        self.progress.setVisible(False)
-        main_layout.addWidget(self.progress)
-        self.progress.setMinimum(0)
-        self.progress.setMaximum(100)
-        self.progress.setValue(0)
+    def _init_layout(self):
+        self._menu_bar = MenuBar(self)
+        self._tool_bar = ToolBar(self)
+        self._status_bar = StatusBar(self)
 
-        self.label_version = QLabel("Version "+config.VERSION)
-        main_layout.addWidget(self.label_version)
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
 
-        # TAB1 LAND IMAGE
-        self.land_tab = QWidget()
-        self.land_image_display = ImageDisplay()
-        land_tab_layout = QVBoxLayout(self.land_tab)
-        land_tab_layout.addWidget(self.land_image_display)
-        self.tabs.addTab(self.land_tab, "Land Image")
+        main_layout = QHBoxLayout(central_widget)
+        main_layout.setContentsMargins(4, 4, 4, 4)
 
-        # Buttons
-        create_button(land_tab_layout,
-                      "Import Land Image",
-                      lambda: import_image(self,
-                                           "Import Land Image",
-                                           self.land_image_display))
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        
+        # Left panel
+        self._left_panel = LeftPanel(self._app, self)
+        splitter.addWidget(self._left_panel)
 
-        # State
-        self.density_image = None
+        # Central panel
+        self._tabs = QTabWidget()
+        self._tabs.currentChanged.connect(self._update_left_panel)
 
-        # TAB2 BOUNDARY IMAGE
-        self.boundary_tab = QWidget()
-        self.boundary_image_display = ImageDisplay()
-        boundary_tab_layout = QVBoxLayout(self.boundary_tab)
-        boundary_tab_layout.addWidget(self.boundary_image_display)
-        self.tabs.addTab(self.boundary_tab, "Boundary Image")
+        # Create all tabs
+        self._tabs_names = ['land', 'boundary', 'density', 'terrain', 'territory', 'province']
 
-        # Buttons
-        create_button(boundary_tab_layout,
-                      "Import Boundary Image",
-                      lambda: import_image(self,
-                                           "Import Boundary Image",
-                                           self.boundary_image_display))
+        for tab_name in self._tabs_names:
+            tab = Tab(tab_name)
+            self._tabs.addTab(tab, tab_name.capitalize())
 
-        # TAB3 DENSITY IMAGE
-        self.density_tab = QWidget()
-        self.density_image_display = ImageDisplay()
-        density_tab_layout = QVBoxLayout(self.density_tab)
-        density_tab_layout.addWidget(self.density_image_display)
-        self.tabs.addTab(self.density_tab, "Density Image")
+        splitter.addWidget(self._tabs)
 
-        # Buttons
-        density_preset_row = QHBoxLayout()
-        density_tab_layout.addLayout(density_preset_row)
+        # Right panel
+        right_panel = RightPanel(self._app, self)
+        splitter.addWidget(right_panel)
 
-        self.button_normalize_density = create_button(
-            density_preset_row,
-            "Normalize Density",
-            lambda: normalize_density(self))
-        self.button_normalize_density.setEnabled(False)
+        splitter.setSizes([300, 900, 300])
+        splitter.setChildrenCollapsible(False)
 
-        self.button_equator_density = create_button(
-            density_preset_row,
-            "Equator Distribution",
-            lambda: equator_density(self))
-        self.button_equator_density.setEnabled(False)
+        main_layout.addWidget(splitter)
 
-        create_button(density_tab_layout,
-                      "Import Density Image",
-                      lambda: import_density_image(self))
 
-        self.territory_exclude_ocean_density = create_checkbox(
-            density_tab_layout, "Territory Exclude Ocean")
+    def _update_left_panel(self, index):
+        self._left_panel.display_content(self._tabs_names[index])
 
-        self.province_exclude_ocean_density = create_checkbox(
-            density_tab_layout, "Province Exclude Ocean")
+    
+    def update_current_left_panel(self):
+        self._update_left_panel(self._tabs.currentIndex())
 
-        # TAB4 TERRAIN IMAGE
-        self.terrain_tab = QWidget()
-        self.terrain_image_display = ImageDisplay()
-        terrain_tab_layout = QVBoxLayout(self.terrain_tab)
-        terrain_tab_layout.addWidget(self.terrain_image_display)
-        self.tabs.addTab(self.terrain_tab, "Terrain Image")
 
-        create_button(terrain_tab_layout,
-                      "Import Terrain Image",
-                      lambda: import_terrain_image(self))
+    def update_all_image_displays(self):
+        for i in range(self._tabs.count()):
+            tab = self._tabs.widget(i)
+            tab_name = tab.get_tab_name()
+            
+            match tab_name:
+                case "land":
+                    tab.get_image_display().set_image(self._app.project.land_image)
+                case "boundary":
+                    tab.get_image_display().set_image(self._app.project.boundary_image)
+                case "density":
+                    tab.get_image_display().set_image(self._app.project.density_image)
+                case "terrain":
+                    tab.get_image_display().set_image(self._app.project.terrain_image)
+                case "territory":
+                    tab.get_image_display().set_image(self._app.project.territory_image)
+                case "province":
+                    tab.get_image_display().set_image(self._app.project.province_image)
 
-        # State
-        self.terrain_image = None
 
-        # TAB5 TERRITORY IMAGE
-        self.territory_tab = QWidget()
-        self.territory_image_display = ImageDisplay()
-        territory_tab_layout = QVBoxLayout(self.territory_tab)
-        territory_tab_layout.addWidget(self.territory_image_display)
-        self.tabs.addTab(self.territory_tab, "Territory Image")
+    def get_current_image_display(self):
+        current_tab = self._tabs.currentWidget()
+        return current_tab.get_image_display()
 
-        button_territory_row = QHBoxLayout()
-        territory_tab_layout.addLayout(button_territory_row)
 
-        # Buttons
-        self.territory_land_slider = create_slider(territory_tab_layout,
-                                                   "Territory Land Density:",
-                                                   config.LAND_TERRITORIES_MIN,
-                                                   config.LAND_TERRITORIES_MAX,
-                                                   config.LAND_TERRITORIES_DEFAULT,
-                                                   config.LAND_TERRITORIES_TICK,
-                                                   config.LAND_TERRITORIES_STEP)
+    # TODO: Perhaps create an actions file containing all the actions instead of storing them here
+    def _create_actions(self):
+        self.action_new = QAction(qta.icon('fa6s.file'), "New", self)
+        self.action_new.setShortcut(QKeySequence.StandardKey.New)
+        self.action_new.triggered.connect(self._project_controller.new_project)
+        self.action_new.setIconVisibleInMenu(False)
 
-        self.territory_ocean_slider = create_slider(territory_tab_layout,
-                                                    "Territory Ocean Density:",
-                                                    config.OCEAN_TERRITORIES_MIN,
-                                                    config.OCEAN_TERRITORIES_MAX,
-                                                    config.OCEAN_TERRITORIES_DEFAULT,
-                                                    config.OCEAN_TERRITORIES_TICK,
-                                                    config.OCEAN_TERRITORIES_STEP)
+        self.action_open = QAction(qta.icon('fa6s.folder-open'), "Open", self)
+        self.action_open.setShortcut(QKeySequence.StandardKey.Open)
+        self.action_open.triggered.connect(self._project_controller.open_project)
+        self.action_open.setIconVisibleInMenu(False)
 
-        territory_density_row = QHBoxLayout()
-        territory_tab_layout.addLayout(territory_density_row)
+        self.action_save = QAction(qta.icon('fa6s.floppy-disk'), "Save", self)
+        self.action_save.setShortcut(QKeySequence.StandardKey.Save)
+        self.action_save.triggered.connect(self._project_controller.save_project)
+        self.action_save.setIconVisibleInMenu(False)
 
-        density_slider_col = QVBoxLayout()
-        territory_density_row.addLayout(density_slider_col, stretch=1)
+        self.action_save_as = QAction("Save as", self)
+        self.action_save_as.setShortcut(QKeySequence.StandardKey.SaveAs)
+        self.action_save_as.triggered.connect(self._project_controller.save_as_project)
 
-        self.territory_density_strength = create_slider(
-            density_slider_col,
-            "Density Strength:",
-            config.DENSITY_STRENGTH_MIN,
-            config.DENSITY_STRENGTH_MAX,
-            config.DENSITY_STRENGTH_DEFAULT,
-            config.DENSITY_STRENGTH_TICK,
-            config.DENSITY_STRENGTH_STEP,
-            display_scale=0.1)
+        self.action_quit = QAction("Quit", self)
+        self.action_quit.setShortcut(QKeySequence.StandardKey.Close)
+        self.action_quit.triggered.connect(self.close)
 
-        jagged_col = QVBoxLayout()
-        territory_density_row.addLayout(jagged_col)
+        # TODO: Create undo / redo actions
+        # self.action_undo = QAction("Undo", self)
+        # self.action_undo.setShortcut(QKeySequence.StandardKey.Undo)
 
-        self.territory_jagged_land = create_checkbox(
-            jagged_col, "Jagged Land Borders")
-        self.territory_jagged_ocean = create_checkbox(
-            jagged_col, "Jagged Ocean Borders")
+        # self.action_redo = QAction("Redo", self)
+        # self.action_redo.setShortcut(QKeySequence.StandardKey.Redo)
 
-        self.button_gen_territories = create_button(territory_tab_layout,
-                                                    "Generate Territories",
-                                                    lambda: generate_territory_map(self))
-        self.button_gen_territories.setEnabled(False)
+        self.action_fullscreen = QAction("Fullscreen", self)
+        self.action_fullscreen.setShortcut(QKeySequence.StandardKey.FullScreen)
+        self.action_fullscreen.triggered.connect(self._fullscreen)
 
-        self.button_exp_terr_img = create_button(button_territory_row,
-                                                 "Export Territory Image",
-                                                 lambda: export_image(self,
-                                                                      self.territory_image_display.get_image(),
-                                                                      "Export Territory Image"))
-        self.button_exp_terr_img.setEnabled(False)
+        self.action_open_github = QAction("GitHub", self)
+        self.action_open_github.triggered.connect(editor_actions.open_github)
 
-        self.button_exp_terr_def = create_button(button_territory_row,
-                                                 "Export Territory Definitions",
-                                                 lambda: export_territory_definitions(self))
-        self.button_exp_terr_def.setEnabled(False)
+        self.action_open_discord = QAction("Discord", self)
+        self.action_open_discord.triggered.connect(editor_actions.open_discord)
 
-        self.button_exp_terr_hist = create_button(button_territory_row,
-                                                  "Export Territory History",
-                                                  lambda: export_territory_history(self))
-        self.button_exp_terr_hist.setEnabled(False)
 
-        # TAB5 PROVINCE IMAGE
-        self.province_tab = QWidget()
-        self.province_image_display = ImageDisplay()
-        province_tab_layout = QVBoxLayout(self.province_tab)
-        province_tab_layout.addWidget(self.province_image_display)
-        self.tabs.addTab(self.province_tab, "Province Image")
-        button_row = QHBoxLayout()
-        province_tab_layout.addLayout(button_row)
+    def _fullscreen(self):
+        if self.isFullScreen() != True:
+            self.showFullScreen()
+        else:
+            self.showNormal()
 
-        # Buttons
-        self.land_slider = create_slider(province_tab_layout,
-                                         "Land province Density:",
-                                         config.LAND_PROVINCES_MIN,
-                                         config.LAND_PROVINCES_MAX,
-                                         config.LAND_PROVINCES_DEFAULT,
-                                         config.LAND_PROVINCES_TICK,
-                                         config.LAND_PROVINCES_STEP)
+    def closeEvent(self, event):
+        if self._app.project.modified == True:
+            save_modal = SaveModal(self)
+            response = save_modal.exec()
 
-        self.ocean_slider = create_slider(province_tab_layout,
-                                          "Ocean province Density",
-                                          config.OCEAN_PROVINCES_MIN,
-                                          config.OCEAN_PROVINCES_MAX,
-                                          config.OCEAN_PROVINCES_DEFAULT,
-                                          config.OCEAN_PROVINCES_TICK,
-                                          config.OCEAN_PROVINCES_STEP)
-
-        province_density_row = QHBoxLayout()
-        province_tab_layout.addLayout(province_density_row)
-
-        prov_density_slider_col = QVBoxLayout()
-        province_density_row.addLayout(prov_density_slider_col, stretch=1)
-
-        self.province_density_strength = create_slider(
-            prov_density_slider_col,
-            "Density Strength:",
-            config.DENSITY_STRENGTH_MIN,
-            config.DENSITY_STRENGTH_MAX,
-            config.DENSITY_STRENGTH_DEFAULT,
-            config.DENSITY_STRENGTH_TICK,
-            config.DENSITY_STRENGTH_STEP,
-            display_scale=0.1)
-
-        prov_jagged_col = QVBoxLayout()
-        province_density_row.addLayout(prov_jagged_col)
-
-        self.province_jagged_land = create_checkbox(
-            prov_jagged_col, "Jagged Land Borders")
-        self.province_jagged_ocean = create_checkbox(
-            prov_jagged_col, "Jagged Ocean Borders")
-
-        self.button_gen_prov = create_button(province_tab_layout,
-                                             "Generate Provinces",
-                                             lambda: generate_province_map(self))
-        self.button_gen_prov.setEnabled(False)
-
-        self.button_exp_prov_img = create_button(button_row,
-                                                 "Export Province Image",
-                                                 lambda: export_image(self,
-                                                                      self.province_image_display.get_image(),
-                                                                      "Export Province Image"))
-        self.button_exp_prov_img.setEnabled(False)
-
-        self.button_exp_prov_def = create_button(button_row,
-                                                  "Export Province Definitions",
-                                                  lambda: export_province_definitions(self))
-        self.button_exp_prov_def.setEnabled(False)
-
-    def check_territory_ready(self):
-        land_exists = self.land_image_display.get_image() is not None
-        density_exists = self.density_image is not None
-        self.button_gen_territories.setEnabled(land_exists and density_exists)
-
+            if response == SaveModal.StandardButton.Save:
+                self._project_controller.save_project()
+                event.ignore()
+            elif response == SaveModal.StandardButton.Discard:
+                self.close()
+            else:
+                event.ignore()
