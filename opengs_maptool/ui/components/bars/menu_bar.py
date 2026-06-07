@@ -19,6 +19,7 @@ class MenuBar:
         menu_file.addAction(self._main_window.action_quit)
 
         menu_edit = menu_bar.addMenu("Edit")
+        menu_edit.addAction(self._main_window.action_open_project_details)
         # menu_edit.addAction(self._main_window.action_undo)
         # menu_edit.addAction(self._main_window.action_redo)
 

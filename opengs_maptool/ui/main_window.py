@@ -8,6 +8,7 @@ from opengs_maptool.ui.components.panels.left_panel import LeftPanel
 from opengs_maptool.ui.components.panels.right_panel import RightPanel
 from opengs_maptool.ui.components.tab import Tab
 from opengs_maptool.ui.modals.error_modal import ErrorModal
+from opengs_maptool.ui.modals.project_details_modal import ProjectDetailsModal
 from opengs_maptool.ui.modals.save_modal import SaveModal
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QKeySequence
@@ -132,6 +133,11 @@ class MainWindow(QMainWindow):
         self.action_quit.setShortcut(QKeySequence.StandardKey.Close)
         self.action_quit.triggered.connect(self.close)
 
+        self.action_open_project_details = QAction(qta.icon('fa6s.pencil'), "Project details", self)
+        self.action_open_project_details.setShortcut(QKeySequence("Ctrl+I"))
+        self.action_open_project_details.triggered.connect(self._open_project_details)
+        self.action_open_project_details.setIconVisibleInMenu(False)
+
         # TODO: Create undo / redo actions
         # self.action_undo = QAction("Undo", self)
         # self.action_undo.setShortcut(QKeySequence.StandardKey.Undo)
@@ -202,6 +208,12 @@ class MainWindow(QMainWindow):
 
         self._project_controller.save_project_as(filename)
         return True
+
+
+    def _open_project_details(self):
+        modal = ProjectDetailsModal(self, self._context.project)
+        if modal.exec():
+            self._refresh_after_project_change()
 
 
     def _confirm_discarded_changes(self) -> bool:
