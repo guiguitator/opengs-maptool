@@ -12,19 +12,22 @@ from opengs_maptool.logic.export_module import (
     export_province_definitions
 )
 from opengs_maptool.logic.import_module import (
-    import_land_image, import_boundary_image,
-    import_density_image, import_terrain_image
+    load_land_image, load_boundary_image,
+    load_density_image, load_terrain_image
 )
 from opengs_maptool.logic.land_actions import get_land_informations
 from opengs_maptool.logic.territory_generator import generate_territory_map
 from opengs_maptool.logic.province_generator import generate_province_map
-from opengs_maptool.app import App
+from opengs_maptool.context import ApplicationContext
 from opengs_maptool.ui.buttons import create_button, create_checkbox, create_slider
+from opengs_maptool.ui.file_dialogs import (
+    pick_open_image, pick_save_data, pick_save_image
+)
 
 class LeftPanel(QWidget):
-    def __init__(self, app: App, main_window):
+    def __init__(self, context: ApplicationContext, main_window):
         super().__init__()
-        self._app = app
+        self._context = context
         self._main_window = main_window
 
         self.setMinimumWidth(280)
@@ -77,7 +80,7 @@ class LeftPanel(QWidget):
         create_button(
             actions_layout,
             "Import Land Image",
-            lambda: self._execute_function_and_update(import_land_image)
+            self._import_land_image
         )
 
         actions_group.setLayout(actions_layout)
@@ -90,19 +93,19 @@ class LeftPanel(QWidget):
         # Land density info
         land_density = QLineEdit()
         land_density.setReadOnly(True)
-        land_density.setText(f"{get_land_informations(self._app.project)[0]:.2f}%")
+        land_density.setText(f"{get_land_informations(self._context.project)[0]:.2f}%")
         infos_layout.addRow("Land density:", land_density)
 
         # Ocean density info
         ocean_density = QLineEdit()
         ocean_density.setReadOnly(True)
-        ocean_density.setText(f"{get_land_informations(self._app.project)[1]:.2f}%")
+        ocean_density.setText(f"{get_land_informations(self._context.project)[1]:.2f}%")
         infos_layout.addRow("Ocean density:", ocean_density)
 
         # Lake density info
         lake_density = QLineEdit()
         lake_density.setReadOnly(True)
-        lake_density.setText(f"{get_land_informations(self._app.project)[2]:.2f}%")
+        lake_density.setText(f"{get_land_informations(self._context.project)[2]:.2f}%")
         infos_layout.addRow("Lake density:", lake_density)
 
         infos_group.setLayout(infos_layout)
@@ -118,7 +121,7 @@ class LeftPanel(QWidget):
         create_button(
             actions_layout,
             "Import Boundary Image",
-            lambda: self._execute_function_and_update(import_boundary_image)
+            self._import_boundary_image
         )
 
         actions_group.setLayout(actions_layout)
@@ -133,7 +136,7 @@ class LeftPanel(QWidget):
         create_button(
             actions_layout,
             "Import Density Image",
-            lambda: self._execute_function_and_update(import_density_image)
+            self._import_density_image
         )
 
         # Remove density image button
@@ -142,7 +145,7 @@ class LeftPanel(QWidget):
             "Remove Density Image",
             lambda: self._execute_function_and_update(remove_density_image)
         )
-        btn_remove_density_image.setEnabled(self._app.project.density_image != None)
+        btn_remove_density_image.setEnabled(self._context.project.density_image != None)
 
         # Normalize density button
         btn_normalize_density = create_button(
@@ -151,7 +154,7 @@ class LeftPanel(QWidget):
             lambda: self._execute_function_and_update(normalize_density)
         )
         btn_normalize_density.setEnabled(
-            self._app.project.density_image == None and self._app.project.land_image != None
+            self._context.project.density_image == None and self._context.project.land_image != None
         )
 
         # Equator distribution button
@@ -161,22 +164,22 @@ class LeftPanel(QWidget):
             lambda: self._execute_function_and_update(equator_density)
         )
         btn_equator_distribution.setEnabled(
-            self._app.project.density_image == None and self._app.project.land_image != None
+            self._context.project.density_image == None and self._context.project.land_image != None
         )
 
         # Territory exclude ocean checkbox
         checkbox_territory_exclude_ocean = create_checkbox(
             actions_layout, "Territory Exclude Ocean",
-            lambda value: setattr(self._app.project, 'territory_exclude_ocean', bool(value))
+            lambda value: setattr(self._context.project, 'territory_exclude_ocean', bool(value))
         )
-        checkbox_territory_exclude_ocean.setChecked(self._app.project.territory_exclude_ocean)
+        checkbox_territory_exclude_ocean.setChecked(self._context.project.territory_exclude_ocean)
 
         # Province exclude ocean checkbox
         checkbox_province_exclude_ocean = create_checkbox(
             actions_layout, "Province Exclude Ocean",
-            lambda value: setattr(self._app.project, 'province_exclude_ocean', bool(value))
+            lambda value: setattr(self._context.project, 'province_exclude_ocean', bool(value))
         )
-        checkbox_province_exclude_ocean.setChecked(self._app.project.province_exclude_ocean)
+        checkbox_province_exclude_ocean.setChecked(self._context.project.province_exclude_ocean)
 
         actions_group.setLayout(actions_layout)
         self._content_layout.addWidget(actions_group)
@@ -190,7 +193,7 @@ class LeftPanel(QWidget):
         create_button(
             actions_layout,
             "Import Terrain Image",
-            lambda: self._execute_function_and_update(import_terrain_image)
+            self._import_terrain_image
         )
 
         actions_group.setLayout(actions_layout)
@@ -208,10 +211,10 @@ class LeftPanel(QWidget):
             "Land Territory Density:",
             config.LAND_TERRITORIES_MIN,
             config.LAND_TERRITORIES_MAX,
-            self._app.project.land_territory_density,
+            self._context.project.land_territory_density,
             config.LAND_TERRITORIES_TICK,
             config.LAND_TERRITORIES_STEP,
-            lambda value: setattr(self._app.project, 'land_territory_density', value)
+            lambda value: setattr(self._context.project, 'land_territory_density', value)
         )
 
         # Set oceanic territory density slider
@@ -220,10 +223,10 @@ class LeftPanel(QWidget):
             "Oceanic Territory Density:",
             config.OCEAN_TERRITORIES_MIN,
             config.OCEAN_TERRITORIES_MAX,
-            self._app.project.oceanic_territory_density,
+            self._context.project.oceanic_territory_density,
             config.OCEAN_TERRITORIES_TICK,
             config.OCEAN_TERRITORIES_STEP,
-            lambda value: setattr(self._app.project, 'oceanic_territory_density', value)
+            lambda value: setattr(self._context.project, 'oceanic_territory_density', value)
         )
 
         # Set territory density strength slider
@@ -232,26 +235,26 @@ class LeftPanel(QWidget):
             "Density Strength:",
             config.DENSITY_STRENGTH_MIN,
             config.DENSITY_STRENGTH_MAX,
-            self._app.project.territory_density_strength,
+            self._context.project.territory_density_strength,
             config.DENSITY_STRENGTH_TICK,
             config.DENSITY_STRENGTH_STEP,
-            lambda value: setattr(self._app.project, 'territory_density_strength', value),
+            lambda value: setattr(self._context.project, 'territory_density_strength', value),
             display_scale=0.1
         )
 
         # Territory jagged land checkbox
         checkbox_territory_jagged_land = create_checkbox(
             actions_layout, "Jagged Land Borders",
-            lambda value: setattr(self._app.project, 'territory_jagged_land', bool(value))
+            lambda value: setattr(self._context.project, 'territory_jagged_land', bool(value))
         )
-        checkbox_territory_jagged_land.setChecked(self._app.project.territory_jagged_land)
+        checkbox_territory_jagged_land.setChecked(self._context.project.territory_jagged_land)
         
         # Territory jagged ocean checkbox
         checkbox_territory_jagged_ocean = create_checkbox(
             actions_layout, "Jagged Ocean Borders",
-            lambda value: setattr(self._app.project, 'territory_jagged_ocean', bool(value))
+            lambda value: setattr(self._context.project, 'territory_jagged_ocean', bool(value))
         )
-        checkbox_territory_jagged_ocean.setChecked(self._app.project.territory_jagged_ocean)
+        checkbox_territory_jagged_ocean.setChecked(self._context.project.territory_jagged_ocean)
 
         # Generate territories button
         btn_generate_territories = create_button(
@@ -259,33 +262,39 @@ class LeftPanel(QWidget):
             "Generate Territories",
             lambda: self._execute_function_and_update(generate_territory_map)
         )
-        btn_generate_territories.setEnabled(self._app.project.can_territory_image_be_generated())
+        btn_generate_territories.setEnabled(self._context.project.can_territory_image_be_generated())
 
         # Export territory image button
         btn_export_territory_image = create_button(
             actions_layout,
             "Export Territory Image",
-            lambda: export_image(
-                self, self._app.project.territory_image, "Export Territory Image"
-            )
+            lambda: self._export_image(self._context.project.territory_image, "Export Territory Image")
         )
-        btn_export_territory_image.setEnabled(self._app.project.territory_image != None)
+        btn_export_territory_image.setEnabled(self._context.project.territory_image != None)
 
         # Export territory definitions button
         btn_export_territory_definitions = create_button(
             actions_layout,
             "Export Territory Definitions",
-            lambda: export_territory_definitions(self._app.project)
+            lambda: self._export_project_data(
+                self._context.project,
+                export_territory_definitions,
+                "Export Territory Definitions"
+            )
         )
-        btn_export_territory_definitions.setEnabled(self._app.project.territory_data != None)
+        btn_export_territory_definitions.setEnabled(self._context.project.territory_data != None)
 
         # Export territory history button
         btn_export_territory_history = create_button(
             actions_layout,
             "Export Territory History",
-            lambda: export_territory_history(self._app.project)
+            lambda: self._export_project_data(
+                self._context.project,
+                export_territory_history,
+                "Export Territory History"
+            )
         )
-        btn_export_territory_history.setEnabled(self._app.project.territory_data != None)
+        btn_export_territory_history.setEnabled(self._context.project.territory_data != None)
 
         actions_group.setLayout(actions_layout)
         self._content_layout.addWidget(actions_group)
@@ -301,10 +310,10 @@ class LeftPanel(QWidget):
             "Land province Density:",
             config.LAND_PROVINCES_MIN,
             config.LAND_PROVINCES_MAX,
-            self._app.project.land_province_density,
+            self._context.project.land_province_density,
             config.LAND_PROVINCES_TICK,
             config.LAND_PROVINCES_STEP,
-            lambda value: setattr(self._app.project, 'land_province_density', value)
+            lambda value: setattr(self._context.project, 'land_province_density', value)
         )
 
         # Set oceanic province density slider
@@ -313,10 +322,10 @@ class LeftPanel(QWidget):
             "Oceanic province Density",
             config.OCEAN_PROVINCES_MIN,
             config.OCEAN_PROVINCES_MAX,
-            self._app.project.oceanic_province_density,
+            self._context.project.oceanic_province_density,
             config.OCEAN_PROVINCES_TICK,
             config.OCEAN_PROVINCES_STEP,
-            lambda value: setattr(self._app.project, 'oceanic_province_density', value)
+            lambda value: setattr(self._context.project, 'oceanic_province_density', value)
         )
 
         # Set province density strength slider
@@ -325,26 +334,26 @@ class LeftPanel(QWidget):
             "Density Strength:",
             config.DENSITY_STRENGTH_MIN,
             config.DENSITY_STRENGTH_MAX,
-            self._app.project.province_density_strength,
+            self._context.project.province_density_strength,
             config.DENSITY_STRENGTH_TICK,
             config.DENSITY_STRENGTH_STEP,
-            lambda value: setattr(self._app.project, 'province_density_strength', value),
+            lambda value: setattr(self._context.project, 'province_density_strength', value),
             display_scale=0.1
         )
 
         # Province jagged land checkbox
         checkbox_province_jagged_land = create_checkbox(
             actions_layout, "Jagged Land Borders",
-            lambda value: setattr(self._app.project, 'province_jagged_land', bool(value))
+            lambda value: setattr(self._context.project, 'province_jagged_land', bool(value))
         )
-        checkbox_province_jagged_land.setChecked(self._app.project.province_jagged_land)
+        checkbox_province_jagged_land.setChecked(self._context.project.province_jagged_land)
         
         # Province jagged ocean checkbox
         checkbox_province_jagged_ocean = create_checkbox(
             actions_layout, "Jagged Ocean Borders",
-            lambda value: setattr(self._app.project, 'province_jagged_ocean', bool(value))
+            lambda value: setattr(self._context.project, 'province_jagged_ocean', bool(value))
         )
-        checkbox_province_jagged_ocean.setChecked(self._app.project.province_jagged_ocean)
+        checkbox_province_jagged_ocean.setChecked(self._context.project.province_jagged_ocean)
         
         # Generate provinces button
         btn_generate_provinces = create_button(
@@ -353,32 +362,96 @@ class LeftPanel(QWidget):
             lambda: self._execute_function_and_update(generate_province_map)
         )
         btn_generate_provinces.setEnabled(
-            self._app.project.territory_image != None and self._app.project.territory_data != None
+            self._context.project.territory_image != None and self._context.project.territory_data != None
         )
 
         # Export province image button
         btn_export_province_image = create_button(
             actions_layout,
             "Export Province Image",
-            lambda: export_image(
-                self, self._app.project.province_image, "Export Province Image"
-            )
+            lambda: self._export_image(self._context.project.province_image, "Export Province Image")
         )
-        btn_export_province_image.setEnabled(self._app.project.province_image != None)
+        btn_export_province_image.setEnabled(self._context.project.province_image != None)
 
         # Export province definitions button
         btn_export_province_definitions = create_button(
             actions_layout,
             "Export Province Definitions",
-            lambda: export_province_definitions(self._app.project)
+            lambda: self._export_project_data(
+                self._context.project,
+                export_province_definitions,
+                "Export Province Definitions"
+            )
         )
-        btn_export_province_definitions.setEnabled(self._app.project.province_data != None)
+        btn_export_province_definitions.setEnabled(self._context.project.province_data != None)
 
         actions_group.setLayout(actions_layout)
         self._content_layout.addWidget(actions_group)
 
 
+    def _import_land_image(self):
+        path = pick_open_image(self, "Import Land Image")
+        if not path:
+            return
+
+        # TODO: Use a service for this and handle errors
+        self._context.project.land_image = load_land_image(path)
+        self._context.project.modified = True
+        self._context.project.density_image = None
+        self._main_window.update_all_image_displays()
+        self.display_content(self._current_tab_name)
+
+
+    def _import_boundary_image(self):
+        path = pick_open_image(self, "Import Boundary Image")
+        if not path:
+            return
+
+        self._context.project.boundary_image = load_boundary_image(path)
+        self._context.project.modified = True
+        self._main_window.update_all_image_displays()
+        self.display_content(self._current_tab_name)
+
+
+    def _import_density_image(self):
+        path = pick_open_image(self, "Import Density Image")
+        if not path:
+            return
+
+        self._context.project.density_image = load_density_image(path)
+        self._context.project.modified = True
+        self._main_window.update_all_image_displays()
+        self.display_content(self._current_tab_name)
+
+
+    def _import_terrain_image(self):
+        path = pick_open_image(self, "Import Terrain Image")
+        if not path:
+            return
+
+        self._context.project.terrain_image = load_terrain_image(path)
+        self._context.project.modified = True
+        self._main_window.update_all_image_displays()
+        self.display_content(self._current_tab_name)
+
+
+    def _export_image(self, image, title):
+        path = pick_save_image(self, title)
+        if not path:
+            return
+
+        export_image(path, image)
+
+
+    def _export_project_data(self, project, exporter_function, title):
+        path, fmt = pick_save_data(self, title)
+        if not path:
+            return
+
+        exporter_function(project, path, fmt)
+
+
     def _execute_function_and_update(self, function):
-        function(self._app.project)
+        function(self._context.project)
         self._main_window.update_all_image_displays()
         self.display_content(self._current_tab_name)

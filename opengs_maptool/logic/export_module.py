@@ -1,4 +1,3 @@
-from PyQt6.QtWidgets import QFileDialog
 from PIL import Image
 import json
 import csv
@@ -7,34 +6,30 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from opengs_maptool.models.project import Project
 
-def export_image(parent_layout, image, text):
-    if image:
-        try:
-            path = _pick_file_image(None, text)
-            if not path:
-                return
-            
-            # Remove the alpha channel for JPEG image export
-            ext = path.lower().rsplit('.', 1)[-1]
-            if ext in ("jpg", "jpeg"):
-                background = Image.new('RGB', image.size, (255, 255, 255))
-                background.paste(image, mask=image.split()[3])
-                image = background
 
-            image.save(path)
+def export_image(path, image):
+    """Export an image to the specified file path."""
+    if not image or not path:
+        return
+    
+    try:
+        # Remove the alpha channel for JPEG image export
+        ext = path.lower().rsplit('.', 1)[-1]
+        if ext in ("jpg", "jpeg"):
+            background = Image.new('RGB', image.size, (255, 255, 255))
+            background.paste(image, mask=image.split()[3])
+            image = background
 
-        except Exception as error:
-            print(f"Error saving image: {error}")
+        image.save(path)
+    except Exception as error:
+        print(f"Error saving image: {error}")
 
 
-def export_territory_definitions(project: Project):
+def export_territory_definitions(project: Project, path: str, fmt: str):
+    """Export territory definitions to the specified path in the given format."""
     territory_data = project.territory_data
     if not territory_data:
         print("No territory data to export.")
-        return
-
-    path, fmt = _pick_file_data(None, "Export Territory Definitions")
-    if not path:
         return
 
     if fmt in ("json", "yaml", "xml"):
@@ -78,14 +73,11 @@ def export_territory_definitions(project: Project):
                             round(d["x"], 2), round(d["y"], 2)])
 
 
-def export_territory_history(project: Project):
+def export_territory_history(project: Project, path: str, fmt: str):
+    """Export territory history to the specified path in the given format."""
     territory_data = project.territory_data
     if not territory_data:
         print("No territory data to export.")
-        return
-
-    path, fmt = _pick_file_data(None, "Export Territory History")
-    if not path:
         return
 
     if fmt in ("json", "yaml", "xml"):
@@ -126,14 +118,11 @@ def export_territory_history(project: Project):
                 w.writerow([d["territory_id"], provinces])
 
 
-def export_province_definitions(project: Project):
+def export_province_definitions(project: Project, path: str, fmt: str):
+    """Export province definitions to the specified path in the given format."""
     province_data = project.province_data
     if not province_data:
         print("No province data to export.")
-        return
-
-    path, fmt = _pick_file_data(None, "Export Province Definitions")
-    if not path:
         return
 
     has_terrain = any("province_terrain" in d for d in province_data)
@@ -185,86 +174,6 @@ def export_province_definitions(project: Project):
                 if has_terrain:
                     row.append(d.get("province_terrain", "unknown"))
                 w.writerow(row)
-
-
-def _pick_file_image(parent, title):
-    """Open save dialog with image format filters. Returns path (with valid file extension) or None"""
-    filters = (
-        "PNG Files (*.png);;"
-        "JPEG Files (*.jpg *.jpeg);;"
-        "BMP Files (*.bmp);;"
-        "GIF Files (*.gif);;"
-        "TIFF Files (*.tiff *.tif);;"
-        "WebP Files (*.webp);;"
-        "All Files (*)"
-    )
-    
-    path, selected_filter = QFileDialog.getSaveFileName(parent, title, "", filters)
-    if not path:
-        return None
-    
-    if not path.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".tif", ".webp")):
-        if "png" in selected_filter.lower():
-            path += ".png"
-        elif "jpeg" in selected_filter.lower(): # or .jpg
-            path += ".jpg"
-        elif "bmp" in selected_filter.lower():
-            path += ".bmp"
-        elif "gif" in selected_filter.lower():
-            path += ".gif"
-        elif "tiff" in selected_filter.lower(): # or .tif
-            path += ".tiff"
-        elif "webp" in selected_filter.lower():
-            path += ".webp"
-        else: # default format
-            path += ".png"
-
-    return path
-
-
-def _pick_file_data(parent, title):
-    """Open save dialog with data format filters. Returns (path, format) or (None, None)."""
-    filters = (
-        "JSON Files (*.json);;"
-        "CSV Files (*.csv);;"
-        "YAML Files (*.yaml *.yml);;"
-        "XML Files (*.xml);;"
-        "All Files (*)"
-    )
-    
-    path, selected_filter = QFileDialog.getSaveFileName(parent, title, "", filters)
-    if not path:
-        return None, None
-        
-    # Determine format from extension
-    if path.lower().endswith(".json"):
-        fmt = "json"
-    elif path.lower().endswith(".csv"):
-        fmt = "csv"
-    elif path.lower().endswith((".yaml", ".yml")):
-        fmt = "yaml"
-    elif path.lower().endswith(".xml"):
-        fmt = "xml"
-    
-    # Fallback to the selected filter
-    elif not path.lower().endswith((".json", ".csv", ".yaml", ".yml", ".xml")):
-        if "json" in selected_filter.lower():
-            fmt = "json"
-            path += ".json"
-        elif "yaml" in selected_filter.lower(): # or .yml
-            fmt = "yaml"
-            path += ".yaml"
-        elif "xml" in selected_filter.lower():
-            fmt = "xml"
-            path += ".xml"
-        elif "csv" in selected_filter.lower():
-            fmt = "csv"
-            path += ".csv"
-        else: # default format
-            fmt = "json"
-            path += ".json"
-
-    return path, fmt
 
 
 def _write_json(path, data):
