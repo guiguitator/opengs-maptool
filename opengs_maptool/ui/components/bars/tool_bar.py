@@ -16,3 +16,5 @@ class ToolBar(QToolBar):
         self.addAction(self._main_window.action_new)
         self.addAction(self._main_window.action_open)
         self.addAction(self._main_window.action_save)
+        self.addSeparator()
+        self.addAction(self._main_window.action_open_project_details)

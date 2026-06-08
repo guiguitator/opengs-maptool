@@ -11,4 +11,5 @@ Here is a list of all the keyboard shortcuts available in the editor.
 | `Ctrl+S`       | Save the project              |
 | `Ctrl+Shift+S` | Save the project as a new one |
 | `Ctrl+F4`      | Quit the editor               |
+| `Ctrl+I`       | Open project details          |
 | `F11`          | Toggles full-screen mode      |
