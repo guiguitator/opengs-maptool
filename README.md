@@ -17,7 +17,7 @@ Province and territory maps form the backbone of these games, defining the geogr
 
 ## Showcase
 Output territory Map:
-![example](examples/output/territores.png)
+![example](examples/output/territories.png)
 Output Province Map:
 ![example2](examples/output/provinces.png)
 
