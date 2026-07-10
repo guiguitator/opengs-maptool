@@ -16,7 +16,7 @@ dependencies = [
     "scipy==1.16.3",
     "tkinterdnd2==0.4.3",
     "PyYAML==6.0.3",
-    "qtawesome==1.4.2"
+    "qtawesome==1.4.2",
 ]
 
 classifiers = [
