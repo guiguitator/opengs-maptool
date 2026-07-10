@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 opengs_maptool.egg-info/
+build/
 
 # IDE
 .idea/
