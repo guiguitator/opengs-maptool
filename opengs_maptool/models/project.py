@@ -1,6 +1,8 @@
 import opengs_maptool.config as config
 
 class Project:
+    """In-memory project state for map inputs, outputs, options, and metadata."""
+
     def __init__(
             self, 
             name: str = "Untitled Project",
