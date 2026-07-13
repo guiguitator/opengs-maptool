@@ -1,5 +1,6 @@
 import opengs_maptool.config as config
 import numpy as np
+from PIL import Image
 from opengs_maptool.logic.numb_gen import NumberSeries
 from opengs_maptool.logic.utils import (
     clear_used_colors, extract_masks, create_region_map, combine_maps,
@@ -8,7 +9,11 @@ from opengs_maptool.logic.utils import (
 from opengs_maptool.models.project import Project
 
 
-def generate_territory_map(project: Project):
+def generate_territory_map(project: Project) -> tuple[Image.Image, list[dict]] | tuple[None, None]:
+    # Safety check matching the button setEnabled condition
+    if not project.can_territory_image_be_generated():
+        return None, None
+
     clear_used_colors()
     # main_layout.progress.setVisible(True) # FIXME: ...
     # main_layout.progress.setValue(0) # FIXME: ...

@@ -11,7 +11,11 @@ from opengs_maptool.logic.utils import (
 from opengs_maptool.models.project import Project
 
 
-def generate_province_map(project: Project):
+def generate_province_map(project: Project) -> tuple[Image.Image, list[dict]] | tuple[None, None]:
+    # Safety check matching the button setEnabled condition
+    if project.territory_image is None or project.territory_data is None:
+        return None, None
+    
     clear_used_colors()
     # main_layout.progress.setVisible(True)
     # main_layout.progress.setValue(0)
