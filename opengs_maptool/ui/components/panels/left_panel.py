@@ -1,3 +1,8 @@
+from __future__ import annotations
+from typing import Literal, TYPE_CHECKING
+if TYPE_CHECKING:
+    from opengs_maptool.ui.main_window import MainWindow
+
 from PyQt6.QtWidgets import (
     QFormLayout, QGroupBox, QLineEdit,
     QScrollArea, QVBoxLayout, QWidget
@@ -11,21 +16,20 @@ from opengs_maptool.logic.export_module import (
     export_image, export_territory_definitions, export_territory_history,
     export_province_definitions
 )
-from opengs_maptool.logic.import_module import (
-    load_land_image, load_boundary_image,
-    load_density_image, load_terrain_image
-)
 from opengs_maptool.logic.land_actions import get_land_informations
 from opengs_maptool.logic.territory_generator import generate_territory_map
 from opengs_maptool.logic.province_generator import generate_province_map
 from opengs_maptool.context import ApplicationContext
+from opengs_maptool.models.command_response import CommandResponse
+from opengs_maptool.models.message import MessageType
+from opengs_maptool.services.command_service import register_command
 from opengs_maptool.ui.buttons import create_button, create_checkbox, create_slider
 from opengs_maptool.ui.file_dialogs import (
     pick_open_image, pick_save_data, pick_save_image
 )
 
 class LeftPanel(QWidget):
-    def __init__(self, context: ApplicationContext, main_window):
+    def __init__(self, context: ApplicationContext, main_window: MainWindow):
         super().__init__()
         self._context = context
         self._main_window = main_window
@@ -39,11 +43,13 @@ class LeftPanel(QWidget):
         self._content_widget = QWidget()
         self._content_layout = QVBoxLayout(self._content_widget)
 
+        self._context.refresh_tab_view = self._refresh_tab_view
+
         self._scroll.setWidget(self._content_widget)
         self._layout.addWidget(self._scroll)
 
 
-    def display_content(self, tab_name: str):
+    def display_content(self, tab_name: Literal["land", "boundary", "density", "terrain", "territory", "province"]):
         self._current_tab_name = tab_name
         self._clear_content()
 
@@ -62,7 +68,6 @@ class LeftPanel(QWidget):
                 self._display_province_content()
 
         self._content_layout.addStretch()
-
 
     def _clear_content(self):
         while self._content_layout.count():
@@ -248,7 +253,7 @@ class LeftPanel(QWidget):
             lambda value: setattr(self._context.project, 'territory_jagged_land', bool(value))
         )
         checkbox_territory_jagged_land.setChecked(self._context.project.territory_jagged_land)
-        
+
         # Territory jagged ocean checkbox
         checkbox_territory_jagged_ocean = create_checkbox(
             actions_layout, "Jagged Ocean Borders",
@@ -347,14 +352,14 @@ class LeftPanel(QWidget):
             lambda value: setattr(self._context.project, 'province_jagged_land', bool(value))
         )
         checkbox_province_jagged_land.setChecked(self._context.project.province_jagged_land)
-        
+
         # Province jagged ocean checkbox
         checkbox_province_jagged_ocean = create_checkbox(
             actions_layout, "Jagged Ocean Borders",
             lambda value: setattr(self._context.project, 'province_jagged_ocean', bool(value))
         )
         checkbox_province_jagged_ocean.setChecked(self._context.project.province_jagged_ocean)
-        
+
         # Generate provinces button
         btn_generate_provinces = create_button(
             actions_layout,
@@ -389,50 +394,32 @@ class LeftPanel(QWidget):
         self._content_layout.addWidget(actions_group)
 
 
-    def _import_land_image(self):
+    def _import_land_image(self) -> None:
         path = pick_open_image(self, "Import Land Image")
         if not path:
             return
-
-        # TODO: Use a service for this and handle errors
-        self._context.project.land_image = load_land_image(path)
-        self._context.project.modified = True
-        self._context.project.density_image = None
-        self._main_window.update_all_image_displays()
-        self.display_content(self._current_tab_name)
+        self._context.submit_system_command(["land.image.import", path])
 
 
     def _import_boundary_image(self):
         path = pick_open_image(self, "Import Boundary Image")
         if not path:
             return
-
-        self._context.project.boundary_image = load_boundary_image(path)
-        self._context.project.modified = True
-        self._main_window.update_all_image_displays()
-        self.display_content(self._current_tab_name)
+        self._context.submit_system_command(["boundary.image.import", path])
 
 
     def _import_density_image(self):
         path = pick_open_image(self, "Import Density Image")
         if not path:
             return
-
-        self._context.project.density_image = load_density_image(path)
-        self._context.project.modified = True
-        self._main_window.update_all_image_displays()
-        self.display_content(self._current_tab_name)
+        self._context.submit_system_command(["density.image.import", path])
 
 
     def _import_terrain_image(self):
         path = pick_open_image(self, "Import Terrain Image")
         if not path:
             return
-
-        self._context.project.terrain_image = load_terrain_image(path)
-        self._context.project.modified = True
-        self._main_window.update_all_image_displays()
-        self.display_content(self._current_tab_name)
+        self._context.submit_system_command(["terrain.image.import", path])
 
 
     def _export_image(self, image, title):
@@ -453,5 +440,10 @@ class LeftPanel(QWidget):
 
     def _execute_function_and_update(self, function):
         function(self._context.project)
+        self._context.refresh_tab_view()
+
+
+    def _refresh_tab_view(self, tab_name: Literal["land", "boundary", "density", "terrain", "territory", "province"]):
         self._main_window.update_all_image_displays()
-        self.display_content(self._current_tab_name)
+        self.display_content(tab_name)
+
