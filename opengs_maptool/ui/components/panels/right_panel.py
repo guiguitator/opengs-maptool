@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QFormLayout, QGroupBox, QScrollArea, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QFormLayout, QGroupBox, QScrollArea, QVBoxLayout, QWidget, QSizePolicy
 from opengs_maptool.context import ApplicationContext
 from opengs_maptool.ui.components.console_widget import ConsoleWidget
 
@@ -7,7 +7,7 @@ class RightPanel(QWidget):
         super().__init__()
         self._context = context
         self._main_window = main_window
-        
+
         self.setMinimumWidth(280)
         self._layout = QVBoxLayout(self)
 
@@ -25,10 +25,9 @@ class RightPanel(QWidget):
         console_group_box_layout.addWidget(console_widget)
 
         console_group_box.setLayout(console_group_box_layout)
-        form_layout.addWidget(console_group_box)
+        console_group_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        form_layout.addWidget(console_group_box, 1)
 
         # Add all boxes to widget
-        form_layout.addStretch()
-
         self._scroll.setWidget(content)
         self._layout.addWidget(self._scroll)

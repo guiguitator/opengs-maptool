@@ -69,15 +69,15 @@ class ConsoleService:
         console.add_message(message)
 
 
-    def get_user_command_history(self, console: Console) -> list[Message]:
+    def get_command_history(self, console: Console) -> list[Message]:
         """
-        Retrieves all messages sent by the user from a console
+        Retrieves all command messages sent to the console
 
         @param console: The console
         """
         history = []
         for message in console.messages:
-            if message.author == MessageAuthor.USER:
+            if message.type == MessageType.COMMAND:
                 history.append(message)
         
         return history

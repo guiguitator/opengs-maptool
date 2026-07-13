@@ -1,6 +1,7 @@
 from enum import Enum
 
 class MessageType(Enum):
+    COMMAND = "command"
     NORMAL = "normal"
     INFO = "info"
     SUCCESS = "success"
