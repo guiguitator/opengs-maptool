@@ -68,15 +68,15 @@ def get_command_arg_specs(command_id: str) -> list[CommandArgSpec]:
 
 def execute_command_list(context: ApplicationContext, command: list[str]) -> CommandResponse:
     """Process an already parsed console command and return a system response message."""
-    return execute_command_string(context, _serialize_command(command))
+    return execute_command_string(context, serialize_command(command))
 
 def execute_command_string(context: ApplicationContext, command_id: str) -> CommandResponse:
     """Process a console command from a string and return a system response message."""
-    command_id, arguments = _split_command(command_id)
+    command_id, arguments = split_command(command_id)
     if command_id:
         if command_exists(command_id):
             try:
-                parsed_arguments = _deserialize_command(command_id, arguments)
+                parsed_arguments = deserialize_command(command_id, arguments)
             except ValueError as err:
                 return CommandResponse(f"Invalid arguments: {err}", MessageType.ERROR)
             
@@ -140,18 +140,19 @@ def _handle_unknown_command(command_id: str) -> CommandResponse:
         response = CommandResponse(f"Unknown command {_single_quotes(command_id)} (run 'link.help' for more info).", MessageType.ERROR)
     return response
 
-def _serialize_command(command_list: list[str|int|float|bool]) -> str:
+def serialize_command(command_list: list[str|int|float|bool]) -> str:
     """Convert a list of command segments into a single string, quoting properly as necessary."""
-    return " ".join(shlex.quote(str(arg)) for arg in command_list)
+    result = " ".join(shlex.quote(str(arg)) for arg in command_list)
+    return result
 
-def _split_command(command_string: str) -> tuple[str|None, list[str]]:
+def split_command(command_string: str) -> tuple[str|None, list[str]]:
     """Split a command string into the command ID and its arguments, respecting quotes."""
     segments = shlex.split(command_string)
     if len(segments) >= 1:
         return segments[0], segments[1:]
     return None, []
 
-def _deserialize_command(command_id: str, argument_values: list[str]) -> list[str]:
+def deserialize_command(command_id: str, argument_values: list[str]) -> list[str]:
     """
     Convert a split command into a list of typed arguments based on the command's argument specifications.
     Given command should exists.

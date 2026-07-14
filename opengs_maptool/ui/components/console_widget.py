@@ -2,7 +2,7 @@ from html import escape
 import opengs_maptool.config as config
 from opengs_maptool.context import ApplicationContext
 from opengs_maptool.controllers.console_controller import ConsoleController
-from opengs_maptool.services.command_service import execute_command_string, execute_command_list
+from opengs_maptool.services.command_service import execute_command_string, execute_command_list, serialize_command
 from opengs_maptool.models.command_response import CommandResponse
 from opengs_maptool.models.message import Message, MessageAuthor, MessageType
 from opengs_maptool.ui.modals.error_modal import ErrorModal
@@ -127,7 +127,7 @@ class ConsoleWidget(QWidget):
             return execute_command_list(self._context, command_segments)
 
         # Print joined command
-        command_text = " ".join(command_segments)
+        command_text = serialize_command(command_segments)
         gui_message = self._console_controller.add_command_message(command_text, MessageAuthor.SYSTEM)
         self.print_message(gui_message) # Show message in widget
 
