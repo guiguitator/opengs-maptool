@@ -93,6 +93,8 @@ DEFAULT_TERRAIN_OCEAN = "deep_ocean"
 DEFAULT_TERRAIN_LAKE = "lakes"
 
 # Console message colors
+CONSOLE_COMMAND_COLOR = "#cf1374"
+CONSOLE_NORMAL_COLOR = "#FFFFFF"
 CONSOLE_INFO_COLOR = "#0958d9"
 CONSOLE_SUCCESS_COLOR = "#7cb305"
 CONSOLE_WARNING_COLOR = "#fadb14"
@@ -100,4 +102,5 @@ CONSOLE_ERROR_COLOR = "#cf1322"
 
 # Others
 GITHUB_URL = "https://github.com/Thomas-Holtvedt/opengs-maptool"
+CONSOLE_HELP_URL = f"{GITHUB_URL}/blob/dev/docs/command_list.md" # IMPORTANT: Change to main when merged into main
 DISCORD_URL = "https://discord.gg/TuXMJAdQg"

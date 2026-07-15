@@ -1,36 +1,45 @@
+from html import escape
 import opengs_maptool.config as config
 from opengs_maptool.context import ApplicationContext
 from opengs_maptool.controllers.console_controller import ConsoleController
-from opengs_maptool.services.command_service import process_command
+from opengs_maptool.services.command_service import execute_command_string, execute_command_list, serialize_command
+from opengs_maptool.models.command_response import CommandResponse
 from opengs_maptool.models.message import Message, MessageAuthor, MessageType
 from opengs_maptool.ui.modals.error_modal import ErrorModal
-from PyQt6.QtWidgets import QFileDialog, QTextEdit, QVBoxLayout, QWidget, QLineEdit, QPushButton, QHBoxLayout
+from PyQt6.QtGui import QFontDatabase, QTextCursor
+from PyQt6.QtWidgets import QFileDialog, QTextEdit, QVBoxLayout, QWidget, QLineEdit, QPushButton, QHBoxLayout, QSizePolicy
 
 class ConsoleWidget(QWidget):
     def __init__(self, context: ApplicationContext, main_window):
         super().__init__()
         self._context = context
         self._main_window = main_window
-        
+
+        monospace_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+
         layout = QVBoxLayout()
 
         self._console_controller = ConsoleController(self._context)
-        
+
         # Output log (read-only)
         self._output = QTextEdit()
+        self._output.setFont(monospace_font)
+        self._output.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._output.setReadOnly(True)
-        self._output.setPlaceholderText("Console Output...")
+        self._output.setPlaceholderText("Type 'link.help' for a help link.")
         layout.addWidget(self._output)
-        
+
         # Input line (for user commands)
         self._input = QLineEdit()
-        self._input.returnPressed.connect(self._submit_command)
+        self._input.setFont(monospace_font)
+        self._input.setPlaceholderText("Enter command...")
+        self._input.returnPressed.connect(self._submit_user_command)
         layout.addWidget(self._input)
 
-        # Buttons 
+        # Buttons
         self._btn_export_logs = QPushButton("Export Logs")
         self._btn_export_logs.clicked.connect(self._export_logs)
-        
+
         self._btn_restore_logs = QPushButton("Restore Logs")
         self._btn_restore_logs.clicked.connect(self._restore_logs)
 
@@ -38,7 +47,12 @@ class ConsoleWidget(QWidget):
         buttons_layout.addWidget(self._btn_export_logs)
         buttons_layout.addWidget(self._btn_restore_logs)
         layout.addLayout(buttons_layout)
-        
+
+        # Keep controls compact while allowing the output area to consume extra vertical space.
+        layout.setStretch(0, 1)
+        layout.setStretch(1, 0)
+        layout.setStretch(2, 0)
+
         self.setLayout(layout)
 
 
@@ -50,49 +64,84 @@ class ConsoleWidget(QWidget):
         @param message: The message to display
         """
         message_text = message.text
+        message_color = None
 
-        if (message.author == MessageAuthor.USER):
-            message_text = f">> {message_text}"
+        match message.type:
+            case MessageType.COMMAND:
+                message_color = config.CONSOLE_COMMAND_COLOR
+                if message.author == MessageAuthor.USER:
+                    message_text = f"USER COMMAND >> {message_text}"
+                elif message.author == MessageAuthor.SYSTEM:
+                    message_text = f"GUI SYSTEM COMMAND >> {message_text}"
 
-        if (message.type != MessageType.NORMAL):
-            message_color = None
+            case MessageType.NORMAL:
+                message_color = config.CONSOLE_NORMAL_COLOR
+            case MessageType.INFO:
+                message_color = config.CONSOLE_INFO_COLOR
+            case MessageType.SUCCESS:
+                message_color = config.CONSOLE_SUCCESS_COLOR
+            case MessageType.WARNING:
+                message_color = config.CONSOLE_WARNING_COLOR
+            case MessageType.ERROR:
+                message_color = config.CONSOLE_ERROR_COLOR
 
-            match message.type:
-                case MessageType.INFO:
-                    message_color = config.CONSOLE_INFO_COLOR
-                case MessageType.SUCCESS:
-                    message_color = config.CONSOLE_SUCCESS_COLOR
-                case MessageType.WARNING:
-                    message_color = config.CONSOLE_WARNING_COLOR
-                case MessageType.ERROR:
-                    message_color = config.CONSOLE_ERROR_COLOR
+        
+        if message_color is not None:
+            # QTextEdit collapses '\n' in rich text; use <br> for visible line breaks.
+            html_text = escape(message_text).replace("\n", "<br>")
+            self._output.append(f"<span style='color: {message_color};'>{html_text}</span>")
+        else:
+            # Insert as plain text to avoid accidental HTML parsing.
+            self._output.moveCursor(QTextCursor.MoveOperation.End)
+            self._output.insertPlainText(message_text + "\n")
 
-            message_text = f"<span style='color: {message_color};'>{message_text}</span>"
-
-        self._output.append(message_text)
         self._output.verticalScrollBar().setValue(self._output.verticalScrollBar().maximum())
 
 
-    def _submit_command(self):
+    def _submit_user_command(self) -> None:
         """
         Sends and displays a user command in the console
         """
         user_message_text = self._input.text().strip()
 
-        if len(user_message_text) != 0:
-            user_message = self._console_controller.add_user_message(user_message_text)
-            self.print_message(user_message) # Show message in widget
+        if len(user_message_text) == 0:
+            return
 
-            # Process command
-            system_response_message = process_command(self._context, user_message)
-            if system_response_message is not None:
-                self._console_controller.add_system_message(
-                    system_response_message.text,
-                    system_response_message.type
-                )
-                self.print_message(system_response_message)
 
+        command_message = self._console_controller.add_command_message(user_message_text, MessageAuthor.USER)
+        self.print_message(command_message) # Show message in widget
+
+        # Process command
+        system_response = execute_command_string(self._context, command_message.text)
+        self._process_command_response(system_response)
+
+        # Update GUI
         self._input.clear()
+
+    def submit_system_command(self, command_segments: list[str]) -> CommandResponse:
+        """
+        Sends and displays a GUI command in the console
+        """
+        if len(command_segments) == 0:
+            # Generate error response for empty command
+            return execute_command_list(self._context, command_segments)
+
+        # Print joined command
+        command_text = serialize_command(command_segments)
+        gui_message = self._console_controller.add_command_message(command_text, MessageAuthor.SYSTEM)
+        self.print_message(gui_message) # Show message in widget
+
+        # Process non-joined command
+        system_response = execute_command_list(self._context, command_segments)
+        self._process_command_response(system_response)
+
+    def _process_command_response(self, response: CommandResponse) -> None:
+        message = response.as_message()
+        self._console_controller.add_response_message(
+            message.text,
+            message.type
+        )
+        self.print_message(message)
 
     def _export_logs(self):
         filename, _ = QFileDialog.getSaveFileName(

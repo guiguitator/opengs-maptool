@@ -6,6 +6,8 @@ from PIL import Image
 import zipfile
 
 class ProjectService:
+    """Create, load, and save Project instances using the GSMAP/ZIP format."""
+
     def create(self) -> Project:
         """
         Create a new empty project.

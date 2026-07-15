@@ -3,6 +3,8 @@ from opengs_maptool.models.project import Project
 from opengs_maptool.services.project_service import ProjectService
 
 class ProjectController:
+    """Coordinate project lifecycle actions between UI context and project service."""
+
     def __init__(self, context: ApplicationContext, project_service: ProjectService | None = None):
         self._context = context
         self._project_service = project_service or ProjectService()
