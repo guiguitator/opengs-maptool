@@ -33,6 +33,7 @@ class LeftPanel(QWidget):
         super().__init__()
         self._context = context
         self._main_window = main_window
+        self._current_tab_name: Literal["land", "boundary", "density", "terrain", "territory", "province"] = "land"
 
         self.setMinimumWidth(280)
         self._layout = QVBoxLayout(self)
@@ -440,7 +441,7 @@ class LeftPanel(QWidget):
 
     def _execute_function_and_update(self, function):
         function(self._context.project)
-        self._context.refresh_tab_view()
+        self._context.refresh_tab_view(self._current_tab_name)
 
 
     def _refresh_tab_view(self, tab_name: Literal["land", "boundary", "density", "terrain", "territory", "province"]):
