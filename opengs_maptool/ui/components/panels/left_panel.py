@@ -44,10 +44,11 @@ class LeftPanel(QWidget):
         self._content_widget = QWidget()
         self._content_layout = QVBoxLayout(self._content_widget)
 
-        self._context.refresh_tab_view = self._refresh_tab_view
-
         self._scroll.setWidget(self._content_widget)
         self._layout.addWidget(self._scroll)
+
+        # Prepare Context
+        self._context.refresh_tab_view = self._refresh_tab_view
 
 
     def display_content(self, tab_name: Literal["land", "boundary", "density", "terrain", "territory", "province"]):

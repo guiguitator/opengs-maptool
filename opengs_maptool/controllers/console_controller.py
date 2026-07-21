@@ -1,12 +1,16 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from opengs_maptool.context import ApplicationContext
+
 from datetime import datetime
-from opengs_maptool.context import ApplicationContext
 from opengs_maptool.models.message import Message, MessageAuthor, MessageType
 from opengs_maptool.services.console_service import ConsoleService
 
 class ConsoleController:
-    def __init__(self, context: ApplicationContext, console_service: ConsoleService | None = None):
+    def __init__(self, context: ApplicationContext, console_service: ConsoleService):
         self._context = context
-        self._console_service = console_service or ConsoleService()
+        self._console_service = console_service
 
     def export_console(self, path: str):
         self._console_service.save(self._context.console, path)

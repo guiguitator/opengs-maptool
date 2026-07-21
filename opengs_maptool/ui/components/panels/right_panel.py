@@ -22,7 +22,6 @@ class RightPanel(QWidget):
         console_group_box_layout = QFormLayout()
 
         console_widget = ConsoleWidget(self._context, self._main_window)
-        self._context.submit_system_command = console_widget.submit_system_command
         console_group_box_layout.addWidget(console_widget)
 
         console_group_box.setLayout(console_group_box_layout)
@@ -32,3 +31,6 @@ class RightPanel(QWidget):
         # Add all boxes to widget
         self._scroll.setWidget(content)
         self._layout.addWidget(self._scroll)
+        
+        # Prepare Context
+        self._context.submit_system_command = console_widget.submit_system_command
