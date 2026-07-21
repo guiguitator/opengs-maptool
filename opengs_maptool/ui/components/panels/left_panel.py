@@ -20,13 +20,11 @@ from opengs_maptool.logic.land_actions import get_land_informations
 from opengs_maptool.logic.territory_generator import generate_territory_map
 from opengs_maptool.logic.province_generator import generate_province_map
 from opengs_maptool.context import ApplicationContext
-from opengs_maptool.models.command_response import CommandResponse
-from opengs_maptool.models.message import MessageType
-from opengs_maptool.services.command_service import register_command
 from opengs_maptool.ui.buttons import create_button, create_checkbox, create_slider
 from opengs_maptool.ui.file_dialogs import (
     pick_open_image, pick_save_data, pick_save_image
 )
+from opengs_maptool.ui.modals.error_modal import ErrorModal
 
 class LeftPanel(QWidget):
     def __init__(self, context: ApplicationContext, main_window: MainWindow):
@@ -395,33 +393,36 @@ class LeftPanel(QWidget):
         actions_group.setLayout(actions_layout)
         self._content_layout.addWidget(actions_group)
 
+    def _show_error_modal_if_exception(self, exception: Exception |None):
+        if exception is not None:
+            modal = ErrorModal(self, str(exception))
+            modal.exec() # Force user to acknowledge the error before continuing
 
     def _import_land_image(self) -> None:
         path = pick_open_image(self, "Import Land Image")
-        if not path:
-            return
-        self._context.submit_system_command(["land.image.import", path])
-
+        if path:
+            error = self._context.import_service.import_land_image(path)
+            self._show_error_modal_if_exception(error)
 
     def _import_boundary_image(self):
         path = pick_open_image(self, "Import Boundary Image")
-        if not path:
-            return
-        self._context.submit_system_command(["boundary.image.import", path])
+        if path:
+            error = self._context.import_service.import_boundary_image(path)
+            self._show_error_modal_if_exception(error)
 
 
     def _import_density_image(self):
         path = pick_open_image(self, "Import Density Image")
-        if not path:
-            return
-        self._context.submit_system_command(["density.image.import", path])
+        if path:
+            error = self._context.import_service.import_density_image(path)
+            self._show_error_modal_if_exception(error)
 
 
     def _import_terrain_image(self):
         path = pick_open_image(self, "Import Terrain Image")
-        if not path:
-            return
-        self._context.submit_system_command(["terrain.image.import", path])
+        if path:
+            error = self._context.import_service.import_terrain_image(path)
+            self._show_error_modal_if_exception(error)
 
 
     def _export_image(self, image, title):

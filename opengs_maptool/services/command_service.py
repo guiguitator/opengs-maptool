@@ -261,46 +261,46 @@ def cmd_console_history_clear(context: ApplicationContext) -> CommandResponse:
 
 @register_command(
     "land.image.import",
-    args=[CommandArgSpec("path", arg_type=str)],
+    args=[CommandArgSpec("path", arg_type=str, description="The path to the land image file to import.")],
 )
 def cmd_land_image_import(context: ApplicationContext, path: str) -> CommandResponse:
     """Imports a land image into the project."""
-    # TODO: Use a service for this (and similar commands) and handle errors
-    # TODO: Handle invalid path and other exceptions in that service
-    context.project.land_image = load_land_image(path)
-    context.project.modified = True
-    context.project.density_image = None # @AUTHOR: Why do this? Even if, why only here?
-    context.refresh_tab_view("land") # We can't rely on current tab name
-    return CommandResponse(f"Image imported from {path}", MessageType.NORMAL)
+    error = context.import_service.import_land_image(path)
+    if error is None:
+        return CommandResponse(f"Image imported from {path}", MessageType.NORMAL)
+    else: # Error is already well formatted
+        return CommandResponse(str(error), MessageType.ERROR)
 
 @register_command(
 "boundary.image.import",
-    args=[CommandArgSpec("path", arg_type=str)],
+    args=[CommandArgSpec("path", arg_type=str, description="The path to the boundary image file to import.")],
 )
 def cmd_boundary_image_import(context: ApplicationContext, path: str) -> CommandResponse:
     """Imports the boundary image from a file."""
-    context.project.boundary_image = load_boundary_image(path)
-    context.project.modified = True
-    context.refresh_tab_view("boundary") # We can't rely on current tab name
-    return CommandResponse(f"Image imported from {path}", MessageType.NORMAL)
+    error = context.import_service.import_boundary_image(path)
+    if error is None:
+        return CommandResponse(f"Image imported from {path}", MessageType.NORMAL)
+    else: # Error is already well formatted
+        return CommandResponse(str(error), MessageType.ERROR)
 
 @register_command("density.image.import",
-    args=[CommandArgSpec("path", arg_type=str)],
+    args=[CommandArgSpec("path", arg_type=str, description="The path to the density image file to import.")],
 )
 def cmd_density_image_import(context: ApplicationContext, path: str) -> CommandResponse:
     """Imports the density image from a file."""
-    context.project.density_image = load_density_image(path)
-    context.project.modified = True
-    context.refresh_tab_view("density") # We can't rely on current tab name
-    return CommandResponse(f"Image imported from {path}", MessageType.NORMAL)
+    error = context.import_service.import_density_image(path)
+    if error is None:
+        return CommandResponse(f"Image imported from {path}", MessageType.NORMAL)
+    else: # Error is already well formatted
+        return CommandResponse(str(error), MessageType.ERROR)
 
 @register_command("terrain.image.import",
-    args=[CommandArgSpec("path", arg_type=str)],
+    args=[CommandArgSpec("path", arg_type=str, description="The path to the terrain image file to import.")],
 )
 def cmd_terrain_image_import(context: ApplicationContext, path: str) -> CommandResponse:
     """Imports the terrain image from a file."""
-    context.project.terrain_image = load_terrain_image(path)
-    context.project.modified = True
-    context.refresh_tab_view("terrain") # We can't rely on current tab name
-    return CommandResponse(f"Image imported from {path}", MessageType.NORMAL)
-
+    error = context.import_service.import_terrain_image(path)
+    if error is None:
+        return CommandResponse(f"Image imported from {path}", MessageType.NORMAL)
+    else: # Error is already well formatted
+        return CommandResponse(str(error), MessageType.ERROR)
