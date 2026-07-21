@@ -1,18 +1,22 @@
-﻿from dataclasses import dataclass
+from __future__ import annotations
 from difflib import get_close_matches
-import shlex
+import mslex
 import traceback
-from typing import Callable
+from typing import Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from opengs_maptool.context import ApplicationContext
 
 import opengs_maptool.config as config
-from opengs_maptool.context import ApplicationContext
-from opengs_maptool.logic.import_module import (
-    load_land_image, load_boundary_image,
-    load_density_image, load_terrain_image
-)
 from opengs_maptool.models.command_response import CommandResponse
 from opengs_maptool.models.message import MessageType
 from opengs_maptool.services.console_service import ConsoleService
+from opengs_maptool.services.parser_service import (
+    CommandArgSpec,
+    CommandArgumentParseError,
+    CommandParserConfigurationError,
+    deserialize_command_arguments,
+)
 
 #####################################################
 #                Base Infrastructure                #
@@ -23,16 +27,9 @@ from opengs_maptool.services.console_service import ConsoleService
 _console_service = ConsoleService()
 
 # command.this.format.id -> implementation function
-_commands = (dict[str, tuple[str, Callable[[ApplicationContext, list[str|int|float|bool]], CommandResponse]]])()
+_commands: dict[str, tuple[Callable[[ApplicationContext, list[str|int|float|bool]], CommandResponse], str, list[CommandArgSpec]]] = {}
 _command_aliases = (dict[str, str])() # alias -> real command
 _SORT_PRIORITY_PREFIXES = ["link", "console", "project"]
-
-@dataclass(frozen=True)
-class CommandArgSpec:
-    # Declarative argument definition used by the command decorator.
-    # Each entry maps one CLI token to one function parameter.
-    name: str
-    arg_type: type[str|int|float|bool] # Converter/Validator
 
 def register_command(
     command_id: str,
@@ -46,7 +43,7 @@ def register_command(
         if aliases:
             for alias in aliases:
                 if command_id not in _commands:
-                    raise ValueError(f"Cannot create alias '{alias}' for unknown command '{command_id}'")
+                    raise ValueError(f"Please report this. Cannot create alias '{alias}' for unknown command '{command_id}'")
                 _command_aliases[alias] = command_id
         return func
     return decorator
@@ -67,25 +64,32 @@ def get_command_arg_specs(command_id: str) -> list[CommandArgSpec]:
     return _commands[command_id][2]
 
 def execute_command_list(context: ApplicationContext, command: list[str]) -> CommandResponse:
-    """Process an already parsed console command and return a system response message."""
+    """
+    Only used for testing purposes.
+    Process an already parsed console command and return a system response message."""
     return execute_command_string(context, serialize_command(command))
 
 def execute_command_string(context: ApplicationContext, command_id: str) -> CommandResponse:
     """Process a console command from a string and return a system response message."""
-    command_id, arguments = split_command(command_id)
+    try:
+        command_id, arguments = split_command(command_id)
+    except ValueError as err:
+        return CommandResponse(f"Invalid command syntax: {err}", MessageType.ERROR)
     if command_id:
         if command_exists(command_id):
             try:
                 parsed_arguments = deserialize_command(command_id, arguments)
-            except ValueError as err:
+            except CommandArgumentParseError as err:
                 return CommandResponse(f"Invalid arguments: {err}", MessageType.ERROR)
-            
+            except CommandParserConfigurationError as err:
+                return CommandResponse(f"Internal command configuration error: {err}", MessageType.ERROR)
+
             command_func = get_command_implementation(command_id)
             response = _run_command_func_with_args(context, command_id, command_func, parsed_arguments)
 
         else:
             return _handle_unknown_command(command_id)
-    
+
     else:
         response = CommandResponse("No command provided.", MessageType.ERROR)
     return response
@@ -98,7 +102,7 @@ def _run_command_func_with_args(
     ) -> CommandResponse:
     try:
         response = command_func(context, *parsed_arguments)
-    
+
     except TypeError as error:
         print(">>> UNEXPECTED ERROR IN COMMAND FUNCTION <<<")
         traceback.print_exc()
@@ -109,7 +113,7 @@ def _run_command_func_with_args(
             )
         else:
             raise
-    
+
     except Exception as error:
         print(">>> UNEXPECTED ERROR IN COMMAND FUNCTION <<<")
         traceback.print_exc()
@@ -142,64 +146,35 @@ def _handle_unknown_command(command_id: str) -> CommandResponse:
 
 def serialize_command(command_list: list[str|int|float|bool]) -> str:
     """Convert a list of command segments into a single string, quoting properly as necessary."""
-    result = " ".join(shlex.quote(str(arg)) for arg in command_list)
+    # The console is not cmd.exe, so use Windows argument quoting without cmd shell rules.
+    result = " ".join(mslex.quote(str(arg), for_cmd=False) for arg in command_list)
     return result
 
 def split_command(command_string: str) -> tuple[str|None, list[str]]:
-    """Split a command string into the command ID and its arguments, respecting quotes."""
-    segments = shlex.split(command_string)
+    """
+    Split a command string into the command ID and its arguments, respecting quotes.
+    Raises:
+        ValueError: When the command string is malformed (e.g., unbalanced quotes)
+    """
+    # The console is not cmd.exe, so use Windows argument parsing without cmd shell rules.
+    segments = mslex.split(command_string, like_cmd=False)
     if len(segments) >= 1:
         return segments[0], segments[1:]
     return None, []
 
-def deserialize_command(command_id: str, argument_values: list[str]) -> list[str]:
+def deserialize_command(command_id: str, argument_values: list[str]) -> list[str|int|float|bool]:
     """
     Convert a split command into a list of typed arguments based on the command's argument specifications.
     Given command should exists.
     Raises:
         ValueError: When given invalid arguments
     """
-    argument_specs = get_command_arg_specs(command_id)
-    expected_argument_names = [spec.name for spec in argument_specs]
-    argument_desciptions = "[" + (", ".join(f"{spec.name} ({spec.arg_type.__name__})" for spec in argument_specs)) + "]"
-
-    if len(argument_values) != len(expected_argument_names):
-        raise ValueError(
-            f"Got {len(argument_values)} arg(s) {argument_values}, "
-            f"but function expects {len(expected_argument_names)} param(s) {argument_desciptions}."
-        )
-
-    converted_arguments = []
-    for i, (argument_value, argument_spec) in enumerate(zip(argument_values, argument_specs)):
-        arg_type = argument_spec.arg_type
-        if arg_type is str:
-            converted_arguments.append(argument_value)
-        
-        elif arg_type is int:
-            try:
-                converted_arguments.append(int(argument_value))
-            except ValueError as error:
-                raise ValueError(f"Argument {_single_quotes(argument_spec.name)} (position {i}) must be an integer, got {_single_quotes(argument_value)}.") from error
-        
-        elif arg_type is float:
-            try:
-                converted_arguments.append(float(argument_value))
-            except ValueError as error:
-                raise ValueError(f"Argument {_single_quotes(argument_spec.name)} (position {i}) must be a float, got {_single_quotes(argument_value)}.") from error
-        
-        elif arg_type is bool:
-            lowered = argument_value.lower()
-            if lowered in {"1", "true", "yes", "on"}:
-                converted_arguments.append(True)
-            elif lowered in {"0", "false", "no", "off"}:
-                converted_arguments.append(False)
-            else:
-                raise ValueError(
-                    f"Argument {_single_quotes(argument_spec.name)} "+
-                    f"(position {i}) must be a boolean, got {_single_quotes(argument_value)}. Possible boolean values: 1, 0, true, false, yes, no, on, off."
-                )
-    
-    return converted_arguments
+    return deserialize_command_arguments(
+        command_id,
+        command_description=get_command_description(command_id),
+        argument_values=argument_values,
+        argument_specs=get_command_arg_specs(command_id),
+    )
 
 def _single_quotes(text: str) -> str:
     """Wraps a string in single quotes."""
