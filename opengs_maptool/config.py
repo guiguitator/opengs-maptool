@@ -102,5 +102,5 @@ CONSOLE_ERROR_COLOR = "#cf1322"
 
 # Others
 GITHUB_URL = "https://github.com/Thomas-Holtvedt/opengs-maptool"
-CONSOLE_HELP_URL = f"{GITHUB_URL}/blob/dev/docs/command_list.md" # IMPORTANT: Change to main when merged into main
+CONSOLE_HELP_URL = f"{GITHUB_URL}/blob/dev/docs/console_guide.md" # IMPORTANT: Change to main when merged into main
 DISCORD_URL = "https://discord.gg/TuXMJAdQg"
