@@ -158,6 +158,9 @@ class MainWindow(QMainWindow):
         self.action_open_github = QAction("GitHub", self)
         self.action_open_github.triggered.connect(editor_actions.open_github)
 
+        self.action_open_console_help = QAction("Console help", self)
+        self.action_open_console_help.triggered.connect(editor_actions.open_console_help)
+
         self.action_open_discord = QAction("Discord", self)
         self.action_open_discord.triggered.connect(editor_actions.open_discord)
 

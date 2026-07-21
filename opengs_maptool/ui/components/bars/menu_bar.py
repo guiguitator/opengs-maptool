@@ -28,4 +28,5 @@ class MenuBar:
 
         menu_help = menu_bar.addMenu("Help")
         menu_help.addAction(self._main_window.action_open_github)
+        menu_help.addAction(self._main_window.action_open_console_help)
         menu_help.addAction(self._main_window.action_open_discord)
