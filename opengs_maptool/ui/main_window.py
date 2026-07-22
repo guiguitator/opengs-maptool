@@ -1,6 +1,10 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from opengs_maptool.app import App
+
 import opengs_maptool.config as config
 import opengs_maptool.logic.editor_actions as editor_actions
-from opengs_maptool.controllers.project_controller import ProjectController
 from opengs_maptool.ui.components.bars.menu_bar import MenuBar
 from opengs_maptool.ui.components.bars.status_bar import StatusBar
 from opengs_maptool.ui.components.bars.tool_bar import ToolBar
@@ -12,15 +16,14 @@ from opengs_maptool.ui.modals.project_details_modal import ProjectDetailsModal
 from opengs_maptool.ui.modals.save_modal import SaveModal
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import (QFileDialog, QMainWindow, QWidget, QHBoxLayout, QProgressBar, QTabWidget, QSplitter)
+from PyQt6.QtWidgets import (QFileDialog, QMainWindow, QWidget, QHBoxLayout, QTabWidget, QSplitter)
 import qtawesome as qta
 
 class MainWindow(QMainWindow):
-    def __init__(self, app):
+    def __init__(self, app: App):
         super().__init__()
         self._app = app
         self._context = app.context
-        self._project_controller = ProjectController(self._context)
         self._project_format_filters = (
             "OpenGS Map Files (*.gsmap);;"
             "ZIP Files (*.zip);;"
@@ -30,9 +33,12 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self._context.project.name + " - " + config.TITLE)
         self.setMinimumSize(800, 600)
         self.resize(config.WINDOW_SIZE_WIDTH, config.WINDOW_SIZE_HEIGHT)
-        
+
         self._create_actions()
         self._init_layout()
+
+        # Prepare Context
+        self._context.refresh_after_project_change = self._refresh_after_project_change
 
 
     def _init_layout(self):
@@ -152,9 +158,11 @@ class MainWindow(QMainWindow):
         self.action_open_github = QAction("GitHub", self)
         self.action_open_github.triggered.connect(editor_actions.open_github)
 
+        self.action_open_console_help = QAction("Console help", self)
+        self.action_open_console_help.triggered.connect(editor_actions.open_console_help)
+
         self.action_open_discord = QAction("Discord", self)
         self.action_open_discord.triggered.connect(editor_actions.open_discord)
-
 
     def _fullscreen(self):
         if self.isFullScreen() != True:
@@ -167,7 +175,7 @@ class MainWindow(QMainWindow):
         if not self._confirm_discarded_changes():
             return
 
-        self._project_controller.create_project()
+        self._context.project_controller.create_project()
         self._refresh_after_project_change()
 
 
@@ -183,7 +191,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            self._project_controller.load_project(filename)
+            self._context.project_controller.load_project(filename)
             self._refresh_after_project_change()
         except Exception:
             error_text = "Cannot open this file, incompatible format"
@@ -192,7 +200,7 @@ class MainWindow(QMainWindow):
 
 
     def _save_project(self) -> bool:
-        if self._project_controller.save_project():
+        if self._context.project_controller.save_project():
             return True
 
         return self._save_project_as()
@@ -206,7 +214,7 @@ class MainWindow(QMainWindow):
         if not filename:
             return False
 
-        self._project_controller.save_project_as(filename)
+        self._context.project_controller.save_project_as(filename)
         return True
 
 
@@ -217,7 +225,7 @@ class MainWindow(QMainWindow):
 
 
     def _confirm_discarded_changes(self) -> bool:
-        if not self._project_controller.is_project_modified():
+        if not self._context.project_controller.is_project_modified():
             return True
 
         save_modal = SaveModal(self)

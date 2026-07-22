@@ -1,22 +1,28 @@
-from opengs_maptool.context import ApplicationContext
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from opengs_maptool.context import ApplicationContext
+
 from opengs_maptool.models.project import Project
 from opengs_maptool.services.project_service import ProjectService
 
 class ProjectController:
     """Coordinate project lifecycle actions between UI context and project service."""
 
-    def __init__(self, context: ApplicationContext, project_service: ProjectService | None = None):
+    def __init__(self, context: ApplicationContext, project_service: ProjectService):
         self._context = context
-        self._project_service = project_service or ProjectService()
+        self._project_service = project_service
 
 
     def create_project(self) -> Project:
+        # TODO: fix bug: last save path is not reset after new project creation
         project = self._project_service.create()
         self._context.project = project
         return project
 
 
     def load_project(self, path: str) -> Project:
+        # TODO: fix bug: last save path is not reset after new project loading
         project = self._project_service.load(path)
         self._context.project = project
         return project

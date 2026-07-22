@@ -1,7 +1,6 @@
 from html import escape
 import opengs_maptool.config as config
 from opengs_maptool.context import ApplicationContext
-from opengs_maptool.controllers.console_controller import ConsoleController
 from opengs_maptool.services.command_service import execute_command_string, execute_command_list, serialize_command
 from opengs_maptool.models.command_response import CommandResponse
 from opengs_maptool.models.message import Message, MessageAuthor, MessageType
@@ -18,8 +17,6 @@ class ConsoleWidget(QWidget):
         monospace_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
 
         layout = QVBoxLayout()
-
-        self._console_controller = ConsoleController(self._context)
 
         # Output log (read-only)
         self._output = QTextEdit()
@@ -71,7 +68,7 @@ class ConsoleWidget(QWidget):
                 message_color = config.CONSOLE_COMMAND_COLOR
                 if message.author == MessageAuthor.USER:
                     message_text = f"USER COMMAND >> {message_text}"
-                elif message.author == MessageAuthor.SYSTEM:
+                elif message.author == MessageAuthor.SYSTEM: # Only used for testing purposes.
                     message_text = f"GUI SYSTEM COMMAND >> {message_text}"
 
             case MessageType.NORMAL:
@@ -85,7 +82,7 @@ class ConsoleWidget(QWidget):
             case MessageType.ERROR:
                 message_color = config.CONSOLE_ERROR_COLOR
 
-        
+
         if message_color is not None:
             # QTextEdit collapses '\n' in rich text; use <br> for visible line breaks.
             html_text = escape(message_text).replace("\n", "<br>")
@@ -108,7 +105,7 @@ class ConsoleWidget(QWidget):
             return
 
 
-        command_message = self._console_controller.add_command_message(user_message_text, MessageAuthor.USER)
+        command_message = self._context.console_controller.add_command_message(user_message_text, MessageAuthor.USER)
         self.print_message(command_message) # Show message in widget
 
         # Process command
@@ -120,7 +117,8 @@ class ConsoleWidget(QWidget):
 
     def submit_system_command(self, command_segments: list[str]) -> CommandResponse:
         """
-        Sends and displays a GUI command in the console
+        Only used for testing purposes.
+        Sends and displays a GUI command in the console.
         """
         if len(command_segments) == 0:
             # Generate error response for empty command
@@ -128,7 +126,7 @@ class ConsoleWidget(QWidget):
 
         # Print joined command
         command_text = serialize_command(command_segments)
-        gui_message = self._console_controller.add_command_message(command_text, MessageAuthor.SYSTEM)
+        gui_message = self._context.console_controller.add_command_message(command_text, MessageAuthor.SYSTEM)
         self.print_message(gui_message) # Show message in widget
 
         # Process non-joined command
@@ -137,7 +135,7 @@ class ConsoleWidget(QWidget):
 
     def _process_command_response(self, response: CommandResponse) -> None:
         message = response.as_message()
-        self._console_controller.add_response_message(
+        self._context.console_controller.add_response_message(
             message.text,
             message.type
         )
@@ -151,7 +149,7 @@ class ConsoleWidget(QWidget):
         if not filename:
             return
 
-        self._console_controller.export_console(filename)
+        self._context.console_controller.export_console(filename)
 
 
     def _restore_logs(self):
