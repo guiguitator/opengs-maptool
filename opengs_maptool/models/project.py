@@ -53,12 +53,18 @@ class Project:
         self.modified: bool = False
 
 
+    def can_density_image_be_removed(self) -> bool:
+        return self.density_image is not None
+
+    def can_density_image_be_generated(self) -> bool:
+        return (self.density_image is None) and (self.land_image is not None)
+
     def can_territory_image_be_generated(self) -> bool:
-        if (
-            not self.land_image or
-            not self.boundary_image or
-            not self.density_image
-        ):
-            return False
-        
-        return True
+        return (
+            (self.land_image is not None) and
+            (self.boundary_image is not None) and
+            (self.density_image is not None)
+        )
+
+    def can_province_image_be_generated(self) -> bool:
+        return (self.terrain_image is not None) and (self.territory_data is not None)
