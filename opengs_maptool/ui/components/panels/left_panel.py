@@ -1,14 +1,20 @@
 from __future__ import annotations
-from typing import Literal, TYPE_CHECKING
+from typing import Any, Callable, TYPE_CHECKING
+
 if TYPE_CHECKING:
     from opengs_maptool.ui.main_window import MainWindow
 
+from PyQt6 import sip
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QFormLayout, QGroupBox, QLineEdit,
     QScrollArea, QVBoxLayout, QWidget
 )
 
 import opengs_maptool.config as config
+from opengs_maptool.context import ApplicationContext, LimitedTaskContext
+from opengs_maptool.controllers.progress_controller import ProgressController
+from opengs_maptool.controllers.task_controller import ThreadTaskSlot
 from opengs_maptool.logic.density_generator import (
     equator_density, normalize_density, remove_density_image
 )
@@ -19,19 +25,20 @@ from opengs_maptool.logic.export_module import (
 from opengs_maptool.logic.land_actions import get_land_informations
 from opengs_maptool.logic.territory_generator import generate_territory_map
 from opengs_maptool.logic.province_generator import generate_province_map
-from opengs_maptool.context import ApplicationContext
+from opengs_maptool.simple_types import TabName
 from opengs_maptool.ui.buttons import create_button, create_checkbox, create_slider
 from opengs_maptool.ui.file_dialogs import (
     pick_open_image, pick_save_data, pick_save_image
 )
 from opengs_maptool.ui.modals.error_modal import ErrorModal
+from opengs_maptool.ui.notifications.notification_manager import NotificationManager
 
 class LeftPanel(QWidget):
     def __init__(self, context: ApplicationContext, main_window: MainWindow):
         super().__init__()
         self._context = context
         self._main_window = main_window
-        self._current_tab_name: Literal["land", "boundary", "density", "terrain", "territory", "province"] = "land"
+        self._current_tab_name: TabName = TabName.LAND
 
         self.setMinimumWidth(280)
         self._layout = QVBoxLayout(self)
@@ -45,26 +52,86 @@ class LeftPanel(QWidget):
         self._scroll.setWidget(self._content_widget)
         self._layout.addWidget(self._scroll)
 
+        # Toast Container for Notifications in Left Panel
+        self.toast_container_layout = QVBoxLayout()
+        self.toast_container_layout.setAlignment(Qt.AlignmentFlag.AlignBottom)
+        self.toast_container_layout.setSpacing(6)
+
+        self._layout.addLayout(self.toast_container_layout)
+
+        # Initialize NotificationManager with task controller
+        self.notification_manager = NotificationManager(
+            main_window=self._main_window,
+            task_controller=self._context.task_controller,
+            toast_container_layout=self.toast_container_layout,
+        )
+
+        # Listen to context refresh requests; emissions from worker threads are
+        # queued to this UI-thread receiver by Qt.
+        self._context.events.refresh_tab_view_requested.connect(self._refresh_tab_view)
+
         # Prepare Context
-        self._context.refresh_tab_view = self._refresh_tab_view
+        self._context.task_controller.thread_task_slot_occupied.connect(self._on_thread_slot_occupied)
+        self._context.task_controller.thread_task_slot_freed.connect(self._on_thread_slot_freed)
 
+    def _on_thread_slot_occupied(self, slot: ThreadTaskSlot) -> None:
+        self._on_thread_slot_updated(slot)
 
-    def display_content(self, tab_name: Literal["land", "boundary", "density", "terrain", "territory", "province"]):
+    def _on_thread_slot_freed(self, slot: ThreadTaskSlot) -> None:
+        self._on_thread_slot_updated(slot)
+
+    def _on_thread_slot_updated(self, slot: ThreadTaskSlot) -> None:
+        match slot:
+            case ThreadTaskSlot.change_density_image if self._current_tab_name == TabName.DENSITY:
+                self._update_density_buttons_state()
+            case ThreadTaskSlot.generate_territory_map if self._current_tab_name == TabName.TERRITORY:
+                self._update_territory_buttons_state()
+            case ThreadTaskSlot.generate_province_map if self._current_tab_name == TabName.PROVINCE:
+                self._update_province_buttons_state()
+
+    def _update_density_buttons_state(self) -> None:
+        if sip.isdeleted(self.btn_remove_density_image): # one suffices
+            return # only do this if the tab is still active and the button exists
+
+        project = self._context.project
+        is_slot_free = not self._context.task_controller.is_thread_slot_occupied(ThreadTaskSlot.change_density_image)
+
+        self.btn_remove_density_image.setEnabled(is_slot_free and project.can_density_image_be_removed())
+        self.btn_normalize_density.setEnabled(is_slot_free and project.can_density_image_be_generated())
+        self.btn_equator_distribution.setEnabled(is_slot_free and project.can_density_image_be_generated())
+
+    def _update_territory_buttons_state(self) -> None:
+        if sip.isdeleted(self.btn_generate_territories):
+            return # only do this if the tab is still active and the button exists
+        is_free = not self._context.task_controller.is_thread_slot_occupied(ThreadTaskSlot.generate_territory_map)
+        self.btn_generate_territories.setEnabled(
+            is_free and self._context.project.can_territory_image_be_generated()
+        )
+
+    def _update_province_buttons_state(self) -> None:
+        if sip.isdeleted(self.btn_generate_provinces):
+            return # only do this if the tab is still active and the button exists
+        is_free = not self._context.task_controller.is_thread_slot_occupied(ThreadTaskSlot.generate_province_map)
+        self.btn_generate_provinces.setEnabled(
+            is_free and self._context.project.can_province_image_be_generated()
+        )
+
+    def display_content(self, tab_name: TabName):
         self._current_tab_name = tab_name
         self._clear_content()
 
         match tab_name:
-            case 'land':
+            case TabName.LAND:
                 self._display_land_content()
-            case 'boundary':
+            case TabName.BOUNDARY:
                 self._display_boundary_content()
-            case 'density':
+            case TabName.DENSITY:
                 self._display_density_content()
-            case 'terrain':
+            case TabName.TERRAIN:
                 self._display_terrain_content()
-            case 'territory':
+            case TabName.TERRITORY:
                 self._display_territory_content()
-            case 'province':
+            case TabName.PROVINCE:
                 self._display_province_content()
 
         self._content_layout.addStretch()
@@ -145,32 +212,38 @@ class LeftPanel(QWidget):
         )
 
         # Remove density image button
-        btn_remove_density_image = create_button(
+        self.btn_remove_density_image = create_button(
             actions_layout,
             "Remove Density Image",
-            lambda: self._execute_function_and_update(remove_density_image)
+            lambda: self._execute_function_in_thread(
+                remove_density_image,
+                "Removing Density Image",
+                ThreadTaskSlot.change_density_image,
+            ),
         )
-        btn_remove_density_image.setEnabled(self._context.project.density_image != None)
 
         # Normalize density button
-        btn_normalize_density = create_button(
+        self.btn_normalize_density = create_button(
             actions_layout,
             "Normalize Density",
-            lambda: self._execute_function_and_update(normalize_density)
-        )
-        btn_normalize_density.setEnabled(
-            self._context.project.density_image == None and self._context.project.land_image != None
+            lambda: self._execute_function_in_thread(
+                normalize_density,
+                "Normalizing Density Image",
+                ThreadTaskSlot.change_density_image,
+            ),
         )
 
         # Equator distribution button
-        btn_equator_distribution = create_button(
+        self.btn_equator_distribution = create_button(
             actions_layout,
             "Equator Distribution",
-            lambda: self._execute_function_and_update(equator_density)
+            lambda: self._execute_function_in_thread(
+                equator_density,
+                "Setting Density Image to Equator Distribution",
+                ThreadTaskSlot.change_density_image,
+            ),
         )
-        btn_equator_distribution.setEnabled(
-            self._context.project.density_image == None and self._context.project.land_image != None
-        )
+        self._update_density_buttons_state()
 
         # Territory exclude ocean checkbox
         checkbox_territory_exclude_ocean = create_checkbox(
@@ -262,12 +335,16 @@ class LeftPanel(QWidget):
         checkbox_territory_jagged_ocean.setChecked(self._context.project.territory_jagged_ocean)
 
         # Generate territories button
-        btn_generate_territories = create_button(
+        self.btn_generate_territories = create_button(
             actions_layout,
             "Generate Territories",
-            lambda: self._execute_function_and_update(generate_territory_map)
+            lambda: self._execute_function_in_thread(
+                generate_territory_map,
+                "Generating Territory Map",
+                ThreadTaskSlot.generate_territory_map,
+            ),
         )
-        btn_generate_territories.setEnabled(self._context.project.can_territory_image_be_generated())
+        self._update_territory_buttons_state()
 
         # Export territory image button
         btn_export_territory_image = create_button(
@@ -361,14 +438,17 @@ class LeftPanel(QWidget):
         checkbox_province_jagged_ocean.setChecked(self._context.project.province_jagged_ocean)
 
         # Generate provinces button
-        btn_generate_provinces = create_button(
+
+        self.btn_generate_provinces = create_button(
             actions_layout,
             "Generate Provinces",
-            lambda: self._execute_function_and_update(generate_province_map)
+            lambda: self._execute_function_in_thread(
+                generate_province_map,
+                "Generating Province Map",
+                ThreadTaskSlot.generate_province_map,
+            ),
         )
-        btn_generate_provinces.setEnabled(
-            self._context.project.territory_image != None and self._context.project.territory_data != None
-        )
+        self._update_province_buttons_state()
 
         # Export province image button
         btn_export_province_image = create_button(
@@ -393,7 +473,7 @@ class LeftPanel(QWidget):
         actions_group.setLayout(actions_layout)
         self._content_layout.addWidget(actions_group)
 
-    def _show_error_modal_if_exception(self, exception: Exception |None):
+    def _show_error_modal_if_exception(self, exception: BaseException | None):
         if exception is not None:
             modal = ErrorModal(self, str(exception))
             modal.exec() # Force user to acknowledge the error before continuing
@@ -441,12 +521,28 @@ class LeftPanel(QWidget):
         exporter_function(project, path, fmt)
 
 
-    def _execute_function_and_update(self, function):
-        function(self._context.project)
-        self._context.refresh_tab_view(self._current_tab_name)
+    def _execute_function_in_thread(
+            self,
+            function: Callable[[LimitedTaskContext, ProgressController], Any],
+            title: str, slot: ThreadTaskSlot,
+        ) -> None:
+
+        task = self._context.task_controller.start_task(
+            function,
+            title,
+            slot,
+            pos_args=[],
+            kw_args={
+                "task_ctx": LimitedTaskContext(self._context),
+            },
+            # "progress_controller" is automatically added as a keyword argument
+        )
 
 
-    def _refresh_tab_view(self, tab_name: Literal["land", "boundary", "density", "terrain", "territory", "province"]):
+    def _refresh_tab_view(self, tab_name: TabName):
         self._main_window.update_all_image_displays()
-        self.display_content(tab_name)
+        if self._current_tab_name == tab_name:
+            # Without this check, the current tab would be filled
+            # with the content of the tab that was asked to be refreshed
+            self.display_content(tab_name)
 

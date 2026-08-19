@@ -5,6 +5,7 @@ if TYPE_CHECKING:
 
 import opengs_maptool.config as config
 import opengs_maptool.logic.editor_actions as editor_actions
+from opengs_maptool.simple_types import TabName
 from opengs_maptool.ui.components.bars.menu_bar import MenuBar
 from opengs_maptool.ui.components.bars.status_bar import StatusBar
 from opengs_maptool.ui.components.bars.tool_bar import ToolBar
@@ -14,9 +15,12 @@ from opengs_maptool.ui.components.tab import Tab
 from opengs_maptool.ui.modals.error_modal import ErrorModal
 from opengs_maptool.ui.modals.project_details_modal import ProjectDetailsModal
 from opengs_maptool.ui.modals.save_modal import SaveModal
+from opengs_maptool.ui.modals.stopping_tasks_modal import StoppingTasksModal
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import (QFileDialog, QMainWindow, QWidget, QHBoxLayout, QTabWidget, QSplitter)
+from PyQt6.QtWidgets import (QFileDialog, QMainWindow, QWidget,
+                             QHBoxLayout, QTabWidget, QVBoxLayout,
+                             QSplitter)
 import qtawesome as qta
 
 class MainWindow(QMainWindow):
@@ -37,9 +41,8 @@ class MainWindow(QMainWindow):
         self._create_actions()
         self._init_layout()
 
-        # Prepare Context
-        self._context.refresh_after_project_change = self._refresh_after_project_change
-
+        # Refresh UI when context reports project-level changes.
+        self._context.events.refresh_after_project_change_requested.connect(self._refresh_after_project_change)
 
     def _init_layout(self):
         self._menu_bar = MenuBar(self)
@@ -49,26 +52,29 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        main_layout = QHBoxLayout(central_widget)
+        main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(4, 4, 4, 4)
 
+        content_layout = QHBoxLayout()
+
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        
+
         # Left panel
         self._left_panel = LeftPanel(self._context, self)
         splitter.addWidget(self._left_panel)
 
         # Central panel
         self._tabs = QTabWidget()
-        self._tabs.currentChanged.connect(self._update_left_panel)
 
         # Create all tabs
-        self._tabs_names = ['land', 'boundary', 'density', 'terrain', 'territory', 'province']
+        # use a trick to avoid typing out the names manually
+        self._tab_names_by_index = list[TabName]()
+        for tab_name_enum in TabName:
+            tab = Tab(tab_name_enum)
+            self._tabs.addTab(tab, tab_name_enum.value.capitalize())
+            self._tab_names_by_index.append(tab_name_enum)
 
-        for tab_name in self._tabs_names:
-            tab = Tab(tab_name)
-            self._tabs.addTab(tab, tab_name.capitalize())
-
+        self._tabs.currentChanged.connect(self._update_left_panel)
         splitter.addWidget(self._tabs)
 
         # Right panel
@@ -78,34 +84,34 @@ class MainWindow(QMainWindow):
         splitter.setSizes([300, 900, 300])
         splitter.setChildrenCollapsible(False)
 
-        main_layout.addWidget(splitter)
-
+        content_layout.addWidget(splitter)
+        main_layout.addLayout(content_layout, stretch=1)
 
     def _update_left_panel(self, index):
-        self._left_panel.display_content(self._tabs_names[index])
+        self._left_panel.display_content(self._tab_names_by_index[index])
 
-    
+
     def update_current_left_panel(self):
         self._update_left_panel(self._tabs.currentIndex())
 
 
     def update_all_image_displays(self):
         for i in range(self._tabs.count()):
-            tab = self._tabs.widget(i)
-            tab_name = tab.get_tab_name()
-            
+            tab: Tab = self._tabs.widget(i)
+            tab_name = tab.get_tab_name_enum()
+
             match tab_name:
-                case "land":
+                case TabName.LAND:
                     tab.get_image_display().set_image(self._context.project.land_image)
-                case "boundary":
+                case TabName.BOUNDARY:
                     tab.get_image_display().set_image(self._context.project.boundary_image)
-                case "density":
+                case TabName.DENSITY:
                     tab.get_image_display().set_image(self._context.project.density_image)
-                case "terrain":
+                case TabName.TERRAIN:
                     tab.get_image_display().set_image(self._context.project.terrain_image)
-                case "territory":
+                case TabName.TERRITORY:
                     tab.get_image_display().set_image(self._context.project.territory_image)
-                case "province":
+                case TabName.PROVINCE:
                     tab.get_image_display().set_image(self._context.project.province_image)
 
 
@@ -163,6 +169,7 @@ class MainWindow(QMainWindow):
 
         self.action_open_discord = QAction("Discord", self)
         self.action_open_discord.triggered.connect(editor_actions.open_discord)
+
 
     def _fullscreen(self):
         if self.isFullScreen() != True:
@@ -247,6 +254,10 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         if self._confirm_discarded_changes():
+            # Ask running background tasks to stop and wait briefly.
+            # If the modal times out the user can choose to force quit.
+            modal = StoppingTasksModal(self)
+            modal.start_and_wait(self._context.task_controller, timeout_ms=4000)
             event.accept()
         else:
             event.ignore()

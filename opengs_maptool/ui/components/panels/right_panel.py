@@ -31,6 +31,6 @@ class RightPanel(QWidget):
         # Add all boxes to widget
         self._scroll.setWidget(content)
         self._layout.addWidget(self._scroll)
-        
+
         # Prepare Context
         self._context.submit_system_command = console_widget.submit_system_command
