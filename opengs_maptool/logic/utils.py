@@ -1,14 +1,14 @@
-import opengs_maptool.config as config
+from __future__ import annotations
 import numpy as np
+from numpy.typing import NDArray
 from PIL import Image
 from scipy.spatial import cKDTree
 from scipy.ndimage import distance_transform_edt, label as ndlabel
-from PyQt6.QtWidgets import QApplication
+from typing import Any
+import opengs_maptool.config as config
+from opengs_maptool.controllers.progress_controller import ProgressController
 
 MAX_LLOYD_SAMPLE = 100_000
-
-# Steps per create_region_map: sampling=1, lloyd=LLOYD_ITERATIONS, assign=1, meta+borders=1
-STEPS_PER_REGION_MAP = 1 + config.LLOYD_ITERATIONS + 1 + 1
 
 used_colors = set()
 
@@ -66,56 +66,63 @@ def random_seeds(mask, num_points, rng_seed=None, density=None,
     return [(int(x), int(y)) for y, x in coords_yx[indices]]
 
 
-def lloyd_relaxation(mask, point_seeds, rng_seed=None, iterations=4, step_fn=None):
+def lloyd_relaxation(mask, point_seeds, progress_controller: ProgressController, rng_seed=None, iterations=4) -> list[tuple[int, int]]:
     """
     Improve seed placement by iteratively moving each seed to the centroid
     of its Voronoi cell.
     """
-    if iterations <= 0 or not point_seeds:
-        return point_seeds
+    prep_phase = progress_controller.add_phase(step_weight=1)
+    loop_phase = progress_controller.add_phase(step_weight=2*iterations)
+        # step_weight can also be set to a constant / doesn't correlate with iterations necessarily
+    finish_phase = progress_controller.add_phase(step_weight=1)
 
-    coords_yx = np.column_stack(np.where(mask))
-    if coords_yx.size == 0:
-        return point_seeds
+    with progress_controller.execute_phase(prep_phase):
+        if iterations <= 0 or not point_seeds:
+            return point_seeds
 
-    coords_xy = np.flip(coords_yx, axis=1).astype(np.float32)
-    rng = np.random.default_rng(rng_seed)
+        coords_yx = np.column_stack(np.where(mask))
+        if coords_yx.size == 0:
+            return point_seeds
 
-    # Subsample for centroid computation
-    if len(coords_xy) > MAX_LLOYD_SAMPLE:
-        sample_idx = rng.choice(len(coords_xy), size=MAX_LLOYD_SAMPLE, replace=False)
-        sample_xy = coords_xy[sample_idx]
-    else:
-        sample_xy = coords_xy
+        coords_xy = np.flip(coords_yx, axis=1).astype(np.float32)
+        rng = np.random.default_rng(rng_seed)
 
-    seeds_arr = np.array(point_seeds, dtype=np.float32)
+        # Subsample for centroid computation
+        if len(coords_xy) > MAX_LLOYD_SAMPLE:
+            sample_idx = rng.choice(len(coords_xy), size=MAX_LLOYD_SAMPLE, replace=False)
+            sample_xy = coords_xy[sample_idx]
+        else:
+            sample_xy = coords_xy
 
-    for _ in range(iterations):
-        tree = cKDTree(seeds_arr)
-        _, labels = tree.query(sample_xy, k=1)
+        seeds_arr = np.array(point_seeds, dtype=np.float32)
 
-        counts = np.bincount(labels, minlength=len(seeds_arr))
-        sum_x = np.bincount(labels, weights=sample_xy[:, 0], minlength=len(seeds_arr))
-        sum_y = np.bincount(labels, weights=sample_xy[:, 1], minlength=len(seeds_arr))
+    with progress_controller.execute_phase(loop_phase) as loop_progress:
+        wrapped_tracker_iterable = loop_progress.track_iteration(range(iterations))
+        for _ in wrapped_tracker_iterable:
+            tree = cKDTree(seeds_arr)
+            _, labels = tree.query(sample_xy, k=1)
 
-        for i in range(len(seeds_arr)):
-            if counts[i] <= 0:
-                idx = rng.integers(0, len(sample_xy))
-                seeds_arr[i] = sample_xy[idx]
-                continue
+            counts = np.bincount(labels, minlength=len(seeds_arr))
+            sum_x = np.bincount(labels, weights=sample_xy[:, 0], minlength=len(seeds_arr))
+            sum_y = np.bincount(labels, weights=sample_xy[:, 1], minlength=len(seeds_arr))
 
-            cx = int(round(sum_x[i] / counts[i]))
-            cy = int(round(sum_y[i] / counts[i]))
-            cx = max(0, min(cx, mask.shape[1] - 1))
-            cy = max(0, min(cy, mask.shape[0] - 1))
+            for i in range(len(seeds_arr)):
+                if counts[i] <= 0:
+                    idx = rng.integers(0, len(sample_xy))
+                    seeds_arr[i] = sample_xy[idx]
+                    continue
 
-            if mask[cy, cx]:
-                seeds_arr[i] = (cx, cy)
+                cx = int(round(sum_x[i] / counts[i]))
+                cy = int(round(sum_y[i] / counts[i]))
+                cx = max(0, min(cx, mask.shape[1] - 1))
+                cy = max(0, min(cy, mask.shape[0] - 1))
 
-        if step_fn is not None:
-            step_fn(1)
+                if mask[cy, cx]:
+                    seeds_arr[i] = (cx, cy)
 
-    return [(int(x), int(y)) for x, y in seeds_arr]
+    with progress_controller.execute_phase(finish_phase):
+        point_seeds = [(int(x), int(y)) for x, y in seeds_arr]
+    return point_seeds
 
 
 def _build_jitter_maps(h, w, seeds_arr):
@@ -154,7 +161,7 @@ def _jitter_coords(coords_xy, coords_yx, jitter_x, jitter_y):
     return out
 
 
-def _remove_enclaves(pmap, mask):
+def _remove_enclaves(pmap, mask, progress_controller: ProgressController):
     """Reassign disconnected region fragments to surrounding regions.
 
     For each region, keeps only the largest connected component.
@@ -166,17 +173,19 @@ def _remove_enclaves(pmap, mask):
 
     cleared = np.zeros(pmap.shape, dtype=bool)
 
-    for rid in unique_ids:
-        region_mask = pmap == rid
-        labeled, n = ndlabel(region_mask)
-        if n <= 1:
-            continue
-        # Keep only the largest component
-        comp_sizes = np.bincount(labeled.ravel())[1:]  # skip background 0
-        largest = comp_sizes.argmax() + 1
-        small = region_mask & (labeled != largest)
-        pmap[small] = -1
-        cleared |= small
+    if len(unique_ids) > 0:
+        # Track loop iteration through unique region IDs (dominates ~95% of enclave removal)
+        for rid in progress_controller.track_iteration(unique_ids):
+            region_mask = pmap == rid
+            labeled, n = ndlabel(region_mask)
+            if n <= 1:
+                continue
+            # Keep only the largest component
+            comp_sizes = np.bincount(labeled.ravel())[1:]  # skip background 0
+            largest = comp_sizes.argmax() + 1
+            small = region_mask & (labeled != largest)
+            pmap[small] = -1
+            cleared |= small
 
     # Fill cleared pixels from nearest assigned neighbor
     if cleared.any() and (pmap >= 0).any():
@@ -184,89 +193,109 @@ def _remove_enclaves(pmap, mask):
         pmap[cleared] = pmap[ny[cleared], nx[cleared]]
 
 
-def assign_regions(mask, seeds, start_index, jagged=False):
+def assign_regions(mask, seeds, start_index, progress_controller: ProgressController, jagged=False):
     """
     Assign each pixel in mask to the nearest seed, respecting boundaries.
 
     Connected components of mask are identified — gaps left by boundary
-    pixels split the mask into separate components.  Seeds can only claim
+    pixels split the mask into separate components. Seeds can only claim
     pixels within their own component, preventing assignments from crossing
-    boundary lines.  Seedless components are filled by nearest assigned
+    boundary lines. Seedless components are filled by nearest assigned
     pixel (Euclidean fallback).
 
     When jagged=True, spatially-correlated noise is added to pixel
     coordinates before the nearest-seed query, producing irregular
-    borders instead of straight Voronoi edges.  A post-processing pass
+    borders instead of straight Voronoi edges. A post-processing pass
     removes any enclaves created by the noise.
     """
-    h, w = mask.shape
-    pmap = np.full((h, w), -1, np.int32)
 
-    if not seeds or not mask.any():
-        return pmap
+    """
+    A test run (24 July 2026) with default settings gave roughly the following distribution of time
+        Jitter generation / Preperation              0.130 seconds ->  5 steps
+        Mask connected components labeling           0.014 seconds ->  5 steps
+        KDTree spatial mapping & query               0.900 seconds -> 28 steps
+        Distance transform fill for seedless areas   0.004 seconds ->  5 steps
+        Enclave removal pass                         2.170 seconds -> 66 steps
+    """
+    jitter_phase = progress_controller.add_phase(step_weight=5)
+    label_phase = progress_controller.add_phase(step_weight=5)
+    assign_phase = progress_controller.add_phase(step_weight=28)
+    fallback_phase = progress_controller.add_phase(step_weight=5)
+    enclave_phase = progress_controller.add_phase(step_weight=66)
 
-    seeds_arr = np.array(seeds, dtype=np.float32)
+    with progress_controller.execute_phase(jitter_phase):
+        h, w = mask.shape
+        pmap = np.full((h, w), -1, np.int32)
 
-    # Precompute jitter noise maps if jagged borders enabled
-    jitter_x = jitter_y = None
-    if jagged:
-        jitter_x, jitter_y = _build_jitter_maps(h, w, seeds_arr)
+        if not seeds or not mask.any():
+            return pmap
 
-    # Label connected components of mask
-    labeled, num_components = ndlabel(mask)
+        seeds_arr = np.array(seeds, dtype=np.float32)
 
-    if num_components <= 1:
-        # Single component (or empty) — fast global KDTree
-        coords_yx = np.column_stack(np.where(mask))
-        coords_xy = np.flip(coords_yx, axis=1).astype(np.float32)
-        query_xy = coords_xy
-        if jitter_x is not None:
-            query_xy = _jitter_coords(coords_xy, coords_yx,
-                                      jitter_x, jitter_y)
-        tree = cKDTree(seeds_arr)
-        _, labels = tree.query(query_xy, k=1)
-        pmap[coords_yx[:, 0], coords_yx[:, 1]] = labels + start_index
-    else:
-        # Map each seed to its component
-        comp_seeds = {}
-        for i, (x, y) in enumerate(seeds):
-            comp = labeled[y, x]
-            if comp > 0:
-                comp_seeds.setdefault(comp, []).append(i)
+        jitter_x = jitter_y = None
+        if jagged:
+            jitter_x, jitter_y = _build_jitter_maps(h, w, seeds_arr)
 
-        # Per-component KDTree assignment
-        for comp_id in range(1, num_components + 1):
-            seed_indices = comp_seeds.get(comp_id)
-            if not seed_indices:
-                continue
+    with progress_controller.execute_phase(label_phase):
+        labeled, num_components = ndlabel(mask)
 
-            comp_mask = labeled == comp_id
-            coords_yx = np.column_stack(np.where(comp_mask))
+    # 3. KDTree Region Assignments
+    with progress_controller.execute_phase(assign_phase) as assign_progress:
+        if num_components <= 1:
+            # Single component - direct KDTree query
+            coords_yx = np.column_stack(np.where(mask))
             coords_xy = np.flip(coords_yx, axis=1).astype(np.float32)
             query_xy = coords_xy
             if jitter_x is not None:
-                query_xy = _jitter_coords(coords_xy, coords_yx,
-                                          jitter_x, jitter_y)
-
-            local_seeds = seeds_arr[seed_indices]
-            tree = cKDTree(local_seeds)
+                query_xy = _jitter_coords(coords_xy, coords_yx, jitter_x, jitter_y)
+            tree = cKDTree(seeds_arr)
             _, labels = tree.query(query_xy, k=1)
+            pmap[coords_yx[:, 0], coords_yx[:, 1]] = labels + start_index
+        else:
+            # Map each seed to its component
+            comp_seeds = {}
+            for i, (x, y) in enumerate(seeds):
+                comp = labeled[y, x]
+                if comp > 0:
+                    comp_seeds.setdefault(comp, []).append(i)
 
-            global_indices = np.array(seed_indices, dtype=np.int32)
-            pmap[coords_yx[:, 0], coords_yx[:, 1]] = (
-                global_indices[labels] + start_index)
+            # Per-component KDTree assignment with progress tracking
+            components_iter = assign_progress.track_iteration(range(1, num_components + 1))
+            for comp_id in components_iter:
+                seed_indices = comp_seeds.get(comp_id)
+                if not seed_indices:
+                    continue
 
-        # Fill seedless components via nearest assigned pixel
+                comp_mask = labeled == comp_id
+                coords_yx = np.column_stack(np.where(comp_mask))
+                coords_xy = np.flip(coords_yx, axis=1).astype(np.float32)
+                query_xy = coords_xy
+                if jitter_x is not None:
+                    query_xy = _jitter_coords(coords_xy, coords_yx, jitter_x, jitter_y)
+
+                local_seeds = seeds_arr[seed_indices]
+                tree = cKDTree(local_seeds)
+                _, labels = tree.query(query_xy, k=1)
+
+                global_indices = np.array(seed_indices, dtype=np.int32)
+                pmap[coords_yx[:, 0], coords_yx[:, 1]] = (
+                    global_indices[labels] + start_index
+                )
+
+    # 4. Fill seedless components via nearest assigned pixel
+    with progress_controller.execute_phase(fallback_phase):
         unassigned = mask & (pmap < 0)
         if unassigned.any() and (pmap >= 0).any():
             _, (ny, nx) = distance_transform_edt(
-                pmap < 0, return_indices=True)
+                pmap < 0, return_indices=True
+            )
             ua = unassigned
             pmap[ua] = pmap[ny[ua], nx[ua]]
 
-    # Remove enclaves created by jitter
-    if jitter_x is not None:
-        _remove_enclaves(pmap, mask)
+    # 5. Remove enclaves created by jitter
+    with progress_controller.execute_phase(enclave_phase) as enclave_progress:
+        if jitter_x is not None:
+            _remove_enclaves(pmap, mask, enclave_progress)
 
     return pmap
 
@@ -291,54 +320,60 @@ def assign_borders(pmap, border_mask):
     pmap[bm] = pmap[ny[bm], nx[bm]]
 
 
-def combine_maps(land_map, sea_map, metadata, land_mask, sea_mask):
+def combine_maps(
+        land_map, sea_map, metadata, land_mask, sea_mask,
+        progress_controller: ProgressController,
+        ) -> tuple[Image.Image, NDArray[np.int32]]:
     """Merge land/sea maps into RGB image. Returns (image, combined_pmap)."""
-    if land_map is not None and land_map.size > 0:
-        h, w = land_map.shape
-    else:
-        h, w = sea_map.shape
 
-    combined = np.full((h, w), -1, np.int32)
+    """
+    A test run (23 July 2026) with default settings gave roughly the following distribution of time
+        combined map created               0.05 seconds ->  5 steps
+        distance_transform_edt completed   0.64 seconds -> 64 steps
+        color assignment completed         0.26 seconds -> 26 steps
+    """
+    combined_map_phase = progress_controller.add_phase(step_weight=5)
+    distance_transform_phase = progress_controller.add_phase(step_weight=64)
+    color_assignment_phase = progress_controller.add_phase(step_weight=26)
 
-    if land_map is not None:
-        lm = (land_map >= 0) & land_mask
-        combined[lm] = land_map[lm]
+    with progress_controller.execute_phase(combined_map_phase):
+        if land_map is not None and land_map.size > 0:
+            h, w = land_map.shape
+        else:
+            h, w = sea_map.shape
 
-    if sea_map is not None:
-        sm = (sea_map >= 0) & sea_mask
-        combined[sm] = sea_map[sm]
+        combined = np.full((h, w), -1, np.int32)
 
-    if (combined >= 0).any():
-        valid = combined >= 0
-        _, (ny, nx) = distance_transform_edt(~valid, return_indices=True)
-        missing = combined < 0
-        combined[missing] = combined[ny[missing], nx[missing]]
+        if land_map is not None:
+            lm = (land_map >= 0) & land_mask
+            combined[lm] = land_map[lm]
 
-    out = np.zeros((h, w, 3), np.uint8)
+        if sea_map is not None:
+            sm = (sea_map >= 0) & sea_mask
+            combined[sm] = sea_map[sm]
 
-    if not metadata:
-        return Image.fromarray(out), combined
+    with progress_controller.execute_phase(distance_transform_phase):
+        if (combined >= 0).any():
+            valid = combined >= 0
+            _, (ny, nx) = distance_transform_edt(~valid, return_indices=True) # Standard t: 0.58s
 
-    color_lut = np.zeros((len(metadata), 3), np.uint8)
+            missing = combined < 0
+            combined[missing] = combined[ny[missing], nx[missing]]
 
-    for index, d in enumerate(metadata):
-        color_lut[index] = (d["R"], d["G"], d["B"])
+    with progress_controller.execute_phase(color_assignment_phase):
+        out = np.zeros((h, w, 3), np.uint8)
 
-    valid = combined >= 0
-    out[valid] = color_lut[combined[valid]]
+        if metadata:
+            color_lut = np.zeros((len(metadata), 3), np.uint8)
 
-    return Image.fromarray(out), combined
+            for index, d in enumerate(metadata):
+                color_lut[index] = (d["R"], d["G"], d["B"])
 
+            valid = combined >= 0
+            out[valid] = color_lut[combined[valid]]
+        image = Image.fromarray(out, mode="RGB")
 
-def make_progress_updater(main_layout, total_steps):
-    done = [0]
-
-    def step(n=1):
-        done[0] = min(done[0] + n, total_steps)
-        main_layout.progress.setValue(int(done[0] * 100 / total_steps))
-        QApplication.processEvents()
-
-    return step
+    return image, combined
 
 
 def extract_masks(boundary_image, land_image):
@@ -414,42 +449,75 @@ def extract_masks(boundary_image, land_image):
     }
 
 
-def create_region_map(fill_mask, border_mask, num_points, start_index,
-                      ptype, series, id_key, type_key, step_fn=None,
-                      density=None, density_strength=1.0, jagged=False):
+def create_region_map(
+        fill_mask, border_mask, num_points, start_index,
+        ptype, series, id_key, type_key,
+        progress_controller: ProgressController,
+        density=None, density_strength=1.0, jagged=False
+    ) -> tuple[NDArray[np.int32], list[dict[str, Any]], int]:
     """Unified region map creator for both provinces and territories.
 
     id_key/type_key control metadata key names (e.g. "province_id"/"province_type"
     or "territory_id"/"territory_type").
     """
-    _step = step_fn if step_fn is not None else (lambda n=1: None)
 
-    if num_points <= 0 or not fill_mask.any():
-        _step(STEPS_PER_REGION_MAP)
-        empty = np.full(fill_mask.shape, -1, np.int32)
-        return empty, [], start_index
+    """
+    A test run (19 August 2026) with default settings (Sliders: 3000, 300, 2.0) gave roughly the following distribution of time
+    (generate_territory_map->Creating land region map): Phase completed: 'Phase 1', duration: 0.13 seconds
+    (generate_territory_map->Creating land region map): Phase completed: 'Phase 2', duration: 0.38 seconds
+    (generate_territory_map->Creating land region map): Phase completed: 'Phase 3', duration: 2.70 seconds
+    (generate_territory_map->Creating land region map): Phase completed: 'Phase 4', duration: 0.64 seconds
+    (generate_territory_map): Phase completed: 'Creating land region map', duration: 3.86 seconds
 
-    seeds = random_seeds(fill_mask, num_points, density=density,
-                         density_strength=density_strength)
-    _step(1)  # sampling done
+    (generate_territory_map->Creating ocean region map): Phase completed: 'Phase 1', duration: 0.09 seconds
+    (generate_territory_map->Creating ocean region map): Phase completed: 'Phase 2', duration: 0.35 seconds
+    (generate_territory_map->Creating ocean region map): Phase completed: 'Phase 3', duration: 1.35 seconds
+    (generate_territory_map->Creating ocean region map): Phase completed: 'Phase 4', duration: 0.53 seconds
+    (generate_territory_map): Phase completed: 'Creating ocean region map', duration: 2.32 seconds
+    Out of this, the following step distribution is concluded:
+    """
 
-    if not seeds:
-        _step(config.LLOYD_ITERATIONS + 1 + 1)
-        empty = np.full(fill_mask.shape, -1, np.int32)
-        return empty, [], start_index
+    sampling_phase = progress_controller.add_phase(step_weight=36)
+    lloyd_phase = progress_controller.add_phase(step_weight=round(118 * (config.LLOYD_ITERATIONS / 4)))
+    assign_phase = progress_controller.add_phase(step_weight=656)
+    borders_phase = progress_controller.add_phase(step_weight=190)
 
-    seeds = lloyd_relaxation(fill_mask, seeds,
-                             iterations=config.LLOYD_ITERATIONS, step_fn=_step)
+    with progress_controller.execute_phase(sampling_phase):
+        if num_points <= 0 or not fill_mask.any():
+            empty = np.full(fill_mask.shape, -1, np.int32)
+            return empty, [], start_index
 
-    pmap = assign_regions(fill_mask, seeds, start_index, jagged=jagged)
-    _step(1)  # assign done
+        seeds = random_seeds(fill_mask, num_points, density=density,
+                            density_strength=density_strength)
 
-    metadata = _build_region_metadata(pmap, seeds, start_index, ptype,
-                                      series, id_key, type_key)
-    assign_borders(pmap, border_mask)
-    _step(1)  # meta + borders done
+    with progress_controller.execute_phase(lloyd_phase) as lloyd_progress:
+        if not seeds:
+            empty = np.full(fill_mask.shape, -1, np.int32)
+            return empty, [], start_index
+        else:
+            seeds = lloyd_relaxation(
+                mask=fill_mask, point_seeds=seeds,
+                progress_controller=lloyd_progress,
+                iterations=config.LLOYD_ITERATIONS,
+            )
 
-    next_index = start_index + len(seeds)
+    with progress_controller.execute_phase(assign_phase) as assign_progress:
+        pmap = assign_regions(fill_mask, seeds, start_index, assign_progress, jagged=jagged)
+
+    with progress_controller.execute_phase(borders_phase) as borders_progress:
+        build_phase = borders_progress.add_phase(step_weight=100)
+        assign_phase = borders_progress.add_phase(step_weight=900)
+
+        with borders_progress.execute_phase(build_phase):
+            # Should be very fast, probably no substeps needed
+            metadata = _build_region_metadata(pmap, seeds, start_index, ptype,
+                                            series, id_key, type_key)
+
+        with borders_progress.execute_phase(assign_phase):
+            # assign_borders is not able to create sub progress (based mostly on external functions)
+            assign_borders(pmap, border_mask)
+            next_index = start_index + len(seeds)
+
     return pmap, metadata, next_index
 
 
