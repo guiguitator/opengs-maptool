@@ -1,6 +1,8 @@
-from typing import Literal, Callable
+from typing import Callable
+from PyQt6.QtCore import QObject, pyqtSignal
 from opengs_maptool.controllers.console_controller import ConsoleController
 from opengs_maptool.controllers.project_controller import ProjectController
+from opengs_maptool.controllers.task_controller import TaskController
 from opengs_maptool.models.command_response import CommandResponse
 from opengs_maptool.models.console import Console
 from opengs_maptool.models.message import MessageType
@@ -8,6 +10,12 @@ from opengs_maptool.models.project import Project
 from opengs_maptool.services.console_service import ConsoleService
 from opengs_maptool.services.import_service import ImportService
 from opengs_maptool.services.project_service import ProjectService
+from opengs_maptool.simple_types import TabName
+
+
+class ApplicationEvents(QObject):
+    refresh_tab_view_requested = pyqtSignal(object)
+    refresh_after_project_change_requested = pyqtSignal()
 
 
 class ApplicationContext:
@@ -20,6 +28,7 @@ class ApplicationContext:
     """
 
     def __init__(self):
+        self.events = ApplicationEvents()
         self.project = Project()
         self.console = Console()
 
@@ -33,15 +42,24 @@ class ApplicationContext:
         # the same applies for ImportService
         self.import_service = ImportService(self)
 
+        self.task_controller = TaskController()
 
         # UI callback assigned by RightPanel once ConsoleWidget is initialized.
         # Only used for testing purposes.
         self.submit_system_command: Callable[[list[str|int|float|bool]], CommandResponse]
         self.submit_system_command = lambda _segments: CommandResponse("Internal error: No command handler assigned.", MessageType.ERROR)
 
-        # UI callback assigned by LeftPanel once panel state is initialized.
-        self.refresh_tab_view: Callable[[Literal["land", "boundary", "density", "terrain", "territory", "province"]], None]
-        self.refresh_tab_view = lambda tab_name: None
+    def refresh_tab_view(self, tab_name: TabName) -> None:
+        self.events.refresh_tab_view_requested.emit(tab_name)
 
-        # UI callback assigned by MainWindow.
-        self.refresh_after_project_change: Callable[[], None] = lambda: None
+    def refresh_after_project_change(self) -> None:
+        self.events.refresh_after_project_change_requested.emit()
+
+class LimitedTaskContext:
+    """
+    A limited subset of ApplicationContext for background tasks.
+    May be expanded as necessary.
+    """
+    def __init__(self, application_context: ApplicationContext):
+        self.refresh_tab_view = application_context.refresh_tab_view
+        self.project = application_context.project
