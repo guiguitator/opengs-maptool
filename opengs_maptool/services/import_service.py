@@ -4,6 +4,7 @@ if TYPE_CHECKING:
     from opengs_maptool.context import ApplicationContext
 
 from opengs_maptool.logic.import_module import load_input_image, ImageLoadingError, ImageLoadingConfigurationError
+from opengs_maptool.simple_types import TabName
 
 class ImportService:
     """Service for importing images into the project without UI or console-specific logic."""
@@ -17,7 +18,7 @@ class ImportService:
             self._context.project.land_image = image
             self._context.project.modified = True
             self._context.project.density_image = None # I didn't think of this, i only kept it.
-            self._context.refresh_tab_view("land") # We can't rely on current tab name
+            self._context.refresh_tab_view(TabName.LAND) # We can't rely on current tab name
         except (ImageLoadingError, ImageLoadingConfigurationError) as error:
             return error
 
@@ -26,7 +27,7 @@ class ImportService:
             image = load_input_image(path, image_channel_mode="RGB")
             self._context.project.boundary_image = image
             self._context.project.modified = True
-            self._context.refresh_tab_view("boundary") # We can't rely on current tab name
+            self._context.refresh_tab_view(TabName.BOUNDARY) # We can't rely on current tab name
         except (ImageLoadingError, ImageLoadingConfigurationError) as error:
             return error
 
@@ -35,7 +36,7 @@ class ImportService:
             image = load_input_image(path, image_channel_mode="L")
             self._context.project.density_image = image
             self._context.project.modified = True
-            self._context.refresh_tab_view("density") # We can't rely on current tab name
+            self._context.refresh_tab_view(TabName.DENSITY) # We can't rely on current tab name
         except (ImageLoadingError, ImageLoadingConfigurationError) as error:
             return error
 
@@ -44,6 +45,6 @@ class ImportService:
             image = load_input_image(path, image_channel_mode="RGB")
             self._context.project.terrain_image = image
             self._context.project.modified = True
-            self._context.refresh_tab_view("terrain") # We can't rely on current tab name
+            self._context.refresh_tab_view(TabName.TERRAIN) # We can't rely on current tab name
         except (ImageLoadingError, ImageLoadingConfigurationError) as error:
             return error

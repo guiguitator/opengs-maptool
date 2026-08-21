@@ -15,10 +15,10 @@ import opengs_maptool.services.command_core as command_core
 def reset_command_registry():
     """
     Backup and reset the global registries before and after every test. -> one test should not affect another test
-    
+
     Explaination: pytest retains global module state (_commands, _command_aliases) across test runs.
-    To prevent test pollution and cascading failures, the reset_command_registry fixture 
-    automatically backs up and resets the registries before each test, yielding execution control, 
+    To prevent test pollution and cascading failures, the reset_command_registry fixture
+    automatically backs up and resets the registries before each test, yielding execution control,
     and restores the original state during teardown regardless of test outcome.
     """
     original_commands = command_core._commands.copy()
@@ -56,7 +56,7 @@ def test_register_command_and_lookup():
 
     assert "ping"          in command_core.get_all_command_aliases()
     assert "test.ping" not in command_core.get_all_command_aliases()
-    
+
     assert command_core.get_command_description("test.ping") == "Pings a target host."
     assert command_core.get_command_description("ping") == "Pings a target host."
 

@@ -104,3 +104,22 @@ CONSOLE_ERROR_COLOR = "#cf1322"
 GITHUB_URL = "https://github.com/Thomas-Holtvedt/opengs-maptool"
 CONSOLE_HELP_URL = f"{GITHUB_URL}/blob/dev/docs/console_guide.md" # IMPORTANT: Change to main when merged into main
 DISCORD_URL = "https://discord.gg/TuXMJAdQg"
+
+# Logging Configuration
+from opengs_maptool.simple_types import LoggingLevel, LoggerCategoryConfiguration
+LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
+LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
+LOG_MAX_BACKUPS = 10  # Number of rotated log files to keep
+LOG_DIR_NAME = 'opengs-maptool'  # Directory name for logs (inside platform-specific path)
+
+# Category-based logging config
+################################################################################################
+# IMPORTANT: Syncronize with logging_service.py:CategoryLoggerRegistry._initialize_from_config #
+################################################################################################
+LOG_CATEGORIES: dict[str, LoggerCategoryConfiguration] = {
+    "task_progress": LoggerCategoryConfiguration(
+        prefix="[Task Progress]",
+        level=LoggingLevel.DEBUG,
+        enabled=True,
+    ),
+}
