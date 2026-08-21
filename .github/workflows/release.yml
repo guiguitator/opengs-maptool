@@ -78,9 +78,9 @@ jobs:
           - os: ubuntu-22.04
             label: Linux
             asset: OpenGS-MapTool-linux-x86_64.tar.gz
-          - os: macos-13
-            label: macOS (Intel)
-            asset: OpenGS-MapTool-macos-x86_64.zip
+          # Apple Silicon only. The macos-13 Intel runners are being retired
+          # and jobs sent to them sit queued forever, which blocks the release.
+          # Intel Mac users can still run from source.
           - os: macos-14
             label: macOS (Apple Silicon)
             asset: OpenGS-MapTool-macos-arm64.zip
