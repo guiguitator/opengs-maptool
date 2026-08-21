@@ -28,6 +28,8 @@ Output Province Map:
 2. Download the file for your system
 3. Run the Executable
 
+The macOS build is for Apple Silicon. On an Intel Mac, use Option 2.
+
 These builds aren't code signed, so Windows and macOS will warn you the first time you open one.
 On Windows pick "More info" then "Run anyway", on macOS right-click the app and choose "Open".
 
