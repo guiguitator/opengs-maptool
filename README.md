@@ -17,22 +17,26 @@ Province and territory maps form the backbone of these games, defining the geogr
 
 ## Showcase
 Output territory Map:
-![example](/example_output/territores.png)
+![example](examples/output/territories.png)
 Output Province Map:
-![example2](/example_output/provinces.png)
+![example2](examples/output/provinces.png)
 
 
 ## How to install
-### Option 1 (Windows only):
+### Option 1 (Windows, macOS or Linux):
 1. "Releases" section in Github
-2. Download and unpack "ogs_maptool.zip"
+2. Download the file for your system
 3. Run the Executable
 
+These builds aren't code signed, so Windows and macOS will warn you the first time you open one.
+On Windows pick "More info" then "Run anyway", on macOS right-click the app and choose "Open".
+
 ### Option 2:
-1. Clone the repository
-2. Download the necessary libraries by running "pip install -r requirements.txt" in your terminal, 
+1. [Download Python](https://www.python.org/downloads/) if not installed (Version 3.12 and up)
+2. Clone the repository
+3. Download the necessary libraries and install by running `pip install .` in your terminal, 
 inside the project directory
-3. Start project by running "python main.py"
+4. Start project by running `python -m opengs_maptool.main` (can be run from any directory, except if you use a venv)
 
 ## How to use the tool
 ### Land Image
@@ -41,7 +45,7 @@ The first tab takes an image that specifies the ocean and lake areas of the map.
 - **Lakes** must be RGB color (0, 255, 0)
 - Everything else is considered land
 
-See examples in the folder "example_input".
+See examples in the folder "examples/input".
 
 ### Boundary Image
 The second tab defines the bounds that the provinces and territories need to adhere to.

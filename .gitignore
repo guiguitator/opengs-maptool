@@ -1,10 +1,13 @@
 # Python
 __pycache__/
 *.pyc
+opengs_maptool.egg-info/
+build/
 
+# Don't ignore .vscode/ because it contains e.g. test settings for the project
 # IDE
 .idea/
-.vscode/
+# .vscode/
 *.iml
 
 # Virtual environment
@@ -12,6 +15,9 @@ __pycache__/
 
 # Windows Zone.Identifier files
 *:Zone.Identifier
+
+# Logging
+logs/
 
 # Claude
 CLAUDE.md
