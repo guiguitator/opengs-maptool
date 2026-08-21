@@ -74,7 +74,7 @@ jobs:
         include:
           - os: windows-latest
             label: Windows
-            asset: OpenGS-MapTool-windows-x86_64.exe
+            asset: OpenGS-MapTool-windows-x86_64.zip
           - os: ubuntu-22.04
             label: Linux
             asset: OpenGS-MapTool-linux-x86_64.tar.gz
@@ -142,20 +142,40 @@ jobs:
           --exclude-module tkinter --exclude-module tkinterdnd2 --exclude-module pytest
           opengs_maptool/main.py
 
+      # Every platform ships a folder, not a bare executable, so the example
+      # input images travel with the app. They are what a new user needs to
+      # generate their first map.
+      - name: Stage release files
+        shell: bash
+        run: |
+          stage="staging/${{ env.APP_NAME }}"
+          mkdir -p "$stage"
+
+          case "${{ runner.os }}" in
+            Windows) cp "dist/${{ env.APP_NAME }}.exe" "$stage/" ;;
+            Linux)   cp "dist/${{ env.APP_NAME }}" "$stage/" ;;
+            # ditto rather than cp, to keep the .app bundle intact.
+            macOS)   ditto "dist/${{ env.APP_NAME }}.app" "$stage/${{ env.APP_NAME }}.app" ;;
+          esac
+
+          cp -R examples/input "$stage/examples"
+          cp README.md LICENSE "$stage/"
+          ls -laR "$stage" | head -30
+
       - name: Package (Windows)
         if: runner.os == 'Windows'
-        shell: bash
-        run: mv "dist/${{ env.APP_NAME }}.exe" "${{ matrix.asset }}"
+        shell: pwsh
+        run: Compress-Archive -Path "staging/${{ env.APP_NAME }}" -DestinationPath "${{ matrix.asset }}"
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
         # tar keeps the executable bit, which a bare release download loses.
-        run: tar -czf "${{ matrix.asset }}" -C dist "${{ env.APP_NAME }}"
+        run: tar -czf "${{ matrix.asset }}" -C staging "${{ env.APP_NAME }}"
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
         # ditto preserves the .app bundle structure that plain zip mangles.
-        run: ditto -c -k --sequesterRsrc --keepParent "dist/${{ env.APP_NAME }}.app" "${{ matrix.asset }}"
+        run: ditto -c -k --sequesterRsrc --keepParent "staging/${{ env.APP_NAME }}" "${{ matrix.asset }}"
 
       - name: Check the asset was produced
         shell: bash

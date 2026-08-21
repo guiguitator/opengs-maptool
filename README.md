@@ -25,8 +25,10 @@ Output Province Map:
 ## How to install
 ### Option 1 (Windows, macOS or Linux):
 1. "Releases" section in Github
-2. Download the file for your system
+2. Download and unpack the file for your system
 3. Run the Executable
+
+The download includes the example input images in an `examples` folder, so you have something to generate a map from straight away.
 
 The macOS build is for Apple Silicon. On an Intel Mac, use Option 2.
 
