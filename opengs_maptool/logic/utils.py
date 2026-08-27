@@ -300,13 +300,13 @@ def assign_regions(mask, seeds, start_index, progress_controller: ProgressContro
     return pmap
 
 
-def is_sea_color(arr):
-    r, g, b = config.OCEAN_COLOR
+def is_sea_color(project, arr):
+    r, g, b = project.ocean_color
     return (arr[..., 0] == r) & (arr[..., 1] == g) & (arr[..., 2] == b)
 
 
-def is_lake_color(arr):
-    r, g, b = config.LAKE_COLOR
+def is_lake_color(project, arr):
+    r, g, b = project.lake_color
     return (arr[..., 0] == r) & (arr[..., 1] == g) & (arr[..., 2] == b)
 
 
@@ -376,19 +376,19 @@ def combine_maps(
     return image, combined
 
 
-def extract_masks(boundary_image, land_image):
+def extract_masks(project):
     """Extract all masks from boundary and land images.
 
     Returns dict with keys: boundary_mask, land_mask, sea_mask,
     land_fill, land_border, sea_fill, sea_border, map_h, map_w
     """
-    if boundary_image is None and land_image is None:
+    if project.boundary_image is None and project.land_image is None:
         raise ValueError(
             "Need at least boundary OR ocean image to determine map size.")
 
     # BOUNDARY MASK
-    if boundary_image is not None:
-        b_arr = np.array(boundary_image, copy=False)
+    if project.boundary_image is not None:
+        b_arr = np.array(project.boundary_image, copy=False)
 
         if b_arr.ndim == 3:
             r, g, b = config.BOUNDARY_COLOR
@@ -406,10 +406,10 @@ def extract_masks(boundary_image, land_image):
         boundary_mask = None
 
     # LAND / SEA / LAKE MASKS
-    if land_image is not None:
-        o_arr = np.array(land_image, copy=False)
-        sea_mask = is_sea_color(o_arr)
-        lake_mask = is_lake_color(o_arr)
+    if project.land_image is not None:
+        o_arr = np.array(project.land_image, copy=False)
+        sea_mask = is_sea_color(project, o_arr)
+        lake_mask = is_lake_color(project, o_arr)
         land_mask = ~sea_mask  # lake pixels are part of land
 
         if boundary_mask is None:
